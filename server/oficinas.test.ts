@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { appRouter } from "./routers";
 import type { TrpcContext } from "./_core/context";
+import * as db from "./db";
 
 // Mock db module
 vi.mock("./db", () => ({
@@ -22,6 +23,7 @@ vi.mock("./db", () => ({
   listDocumentos: vi.fn().mockResolvedValue([]),
   listAvaliacoes: vi.fn().mockResolvedValue([]),
   createAvaliacao: vi.fn().mockResolvedValue(1),
+  getAvaliacaoByUserAndOficina: vi.fn().mockResolvedValue(null),
   listAllAvaliacoes: vi.fn().mockResolvedValue([]),
   updateAvaliacaoStatus: vi.fn().mockResolvedValue(undefined),
   createClienteB2B: vi.fn().mockResolvedValue(1),
@@ -131,14 +133,41 @@ describe("oficinas.alterarStatus (admin)", () => {
 });
 
 describe("avaliacoes.criar", () => {
-  it("creates an avaliacao for authenticated user", async () => {
-    const caller = appRouter.createCaller(createContext("user"));
+  it("creates an avaliacao for a non-owner with no prior review", async () => {
+    // oficina mock tem userId 1; avaliador é o usuário 2.
+    const caller = appRouter.createCaller(createContext("user", 2));
     const result = await caller.avaliacoes.criar({
       oficinaId: 1,
       notaGeral: 5,
       comentario: "Excelente serviço!",
     });
     expect(result).toHaveProperty("id");
+  });
+
+  it("blocks reviewing your own oficina", async () => {
+    // contexto userId 1 == oficina.userId 1
+    const caller = appRouter.createCaller(createContext("user", 1));
+    await expect(
+      caller.avaliacoes.criar({ oficinaId: 1, notaGeral: 5 })
+    ).rejects.toThrow();
+  });
+
+  it("blocks a duplicate review by the same user", async () => {
+    vi.mocked(db.getAvaliacaoByUserAndOficina).mockResolvedValueOnce({ id: 9 } as any);
+    const caller = appRouter.createCaller(createContext("user", 2));
+    await expect(
+      caller.avaliacoes.criar({ oficinaId: 1, notaGeral: 4 })
+    ).rejects.toThrow();
+  });
+
+  it("blocks reviewing a non-active oficina", async () => {
+    vi.mocked(db.getOficinaById).mockResolvedValueOnce({
+      id: 1, userId: 1, status: "pendente",
+    } as any);
+    const caller = appRouter.createCaller(createContext("user", 2));
+    await expect(
+      caller.avaliacoes.criar({ oficinaId: 1, notaGeral: 4 })
+    ).rejects.toThrow();
   });
 });
 

@@ -2,13 +2,29 @@ import { eq, and, like, or, sql, desc, asc, count } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao } from "../drizzle/schema";
 import { ENV } from './_core/env';
+import { encryptOficinaFields, decryptOficinaFields } from './_core/crypto';
+import { cached, invalidatePrefix } from './_core/cache';
+
+const OFICINAS_CACHE_PREFIX = "oficinas:public:";
+const OFICINAS_CACHE_TTL_MS = 30_000;
 
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      // `connection` como objeto: o mysql2 ainda faz o parsing da URI
+      // (inclusive `ssl={...}` do TiDB), e podemos dimensionar o pool.
+      _db = drizzle({
+        connection: {
+          uri: process.env.DATABASE_URL,
+          connectionLimit: 15,
+          enableKeepAlive: true,
+          keepAliveInitialDelay: 10_000,
+          supportBigNumbers: true,
+          bigNumberStrings: false,
+        },
+      });
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;
@@ -63,27 +79,29 @@ export async function getUserByOpenId(openId: string) {
 export async function createOficina(data: InsertOficina) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  const result = await db.insert(oficinas).values(data);
+  const result = await db.insert(oficinas).values(encryptOficinaFields(data));
+  invalidatePrefix(OFICINAS_CACHE_PREFIX);
   return result[0].insertId;
 }
 
 export async function updateOficina(id: number, data: Partial<InsertOficina>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(oficinas).set(data).where(eq(oficinas.id, id));
+  await db.update(oficinas).set(encryptOficinaFields(data)).where(eq(oficinas.id, id));
+  invalidatePrefix(OFICINAS_CACHE_PREFIX);
 }
 
 export async function getOficinaById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(oficinas).where(eq(oficinas.id, id)).limit(1);
-  const oficina = result[0];
-  
+  const oficina = decryptOficinaFields(result[0]);
+
   if (oficina) {
     const fotos = await db.select().from(oficinaDocumentos).where(eq(oficinaDocumentos.oficinaId, id));
     return { ...oficina, fotos };
   }
-  
+
   return undefined;
 }
 
@@ -91,7 +109,7 @@ export async function getOficinaByUserId(userId: number) {
   const db = await getDb();
   if (!db) return undefined;
   const result = await db.select().from(oficinas).where(eq(oficinas.userId, userId)).limit(1);
-  return result[0] || undefined;
+  return decryptOficinaFields(result[0]) || undefined;
 }
 
 export async function listOficinas(filters?: {
@@ -154,7 +172,10 @@ export async function listOficinasPublic(filters?: {
   limit?: number;
   offset?: number;
 }) {
-  return listOficinas({ ...filters, status: "ativa" });
+  const key = OFICINAS_CACHE_PREFIX + JSON.stringify(filters ?? {});
+  return cached(key, OFICINAS_CACHE_TTL_MS, () =>
+    listOficinas({ ...filters, status: "ativa" })
+  );
 }
 
 export async function getOficinasMetrics() {
@@ -183,11 +204,21 @@ export async function getOficinasMetrics() {
 
 // ==================== AVALIAÇÕES ====================
 
+// Antifraude: uma avaliação por usuário por oficina.
+export async function getAvaliacaoByUserAndOficina(userId: number, oficinaId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(avaliacoes)
+    .where(and(eq(avaliacoes.userId, userId), eq(avaliacoes.oficinaId, oficinaId)))
+    .limit(1);
+  return result[0] || undefined;
+}
+
 export async function createAvaliacao(data: InsertAvaliacao) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(avaliacoes).values(data);
-  
+
   // Update oficina score
   await recalcularScore(data.oficinaId);
   return result[0].insertId;
@@ -211,6 +242,9 @@ export async function recalcularScore(oficinaId: number) {
     scoreReputacao: String(Math.round(avg * 10) / 10),
     totalAvaliacoes: total
   }).where(eq(oficinas.id, oficinaId));
+
+  // O score altera a ordenação da listagem pública em cache.
+  invalidatePrefix(OFICINAS_CACHE_PREFIX);
 }
 
 export async function listAvaliacoes(oficinaId: number) {

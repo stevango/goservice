@@ -209,6 +209,21 @@ export const appRouter = router({
       tipoServico: z.string().optional(),
       tipoVeiculo: z.string().optional(),
     })).mutation(async ({ ctx, input }) => {
+      // Antifraude: oficina precisa existir e estar ativa.
+      const oficina = await db.getOficinaById(input.oficinaId);
+      if (!oficina || oficina.status !== 'ativa') {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Oficina não encontrada' });
+      }
+      // Não pode avaliar a própria oficina.
+      if (oficina.userId === ctx.user.id) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Você não pode avaliar a sua própria oficina' });
+      }
+      // Uma avaliação por usuário por oficina.
+      const existente = await db.getAvaliacaoByUserAndOficina(ctx.user.id, input.oficinaId);
+      if (existente) {
+        throw new TRPCError({ code: 'CONFLICT', message: 'Você já avaliou esta oficina' });
+      }
+
       const id = await db.createAvaliacao({
         ...input,
         userId: ctx.user.id,

@@ -9,7 +9,9 @@ import { registerOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
+import type { Request, Response, NextFunction } from "express";
 import { serveStatic, setupVite } from "./vite";
+import { isFieldEncryptionConfigured } from "./crypto";
 
 // Falha cedo se o segredo de sessão for ausente/fraco: com segredo fraco
 // qualquer pessoa forja o cookie de sessão (inclusive admin).
@@ -24,6 +26,42 @@ function assertSessionSecret() {
     }
     console.warn(msg);
   }
+}
+
+// Falha cedo em produção se a criptografia de campos sensíveis (LGPD)
+// não estiver configurada.
+function assertFieldEncryption() {
+  if (!isFieldEncryptionConfigured()) {
+    const msg =
+      "[Security] FIELD_ENCRYPTION_KEY ausente. Dados bancários/PIX/CPF " +
+      "ficariam em texto puro. Gere com `openssl rand -base64 32`.";
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(msg);
+    }
+    console.warn(msg);
+  }
+}
+
+// Proteção CSRF: mutações tRPC são POST. Se a requisição vier de outra
+// origem (Origin presente e host != host do servidor), rejeita. Requests
+// sem Origin (server-to-server/cron) passam — CSRF exige um navegador,
+// que sempre envia Origin em POST cross-site.
+function csrfGuard(req: Request, res: Response, next: NextFunction) {
+  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+    return next();
+  }
+  const origin = req.headers.origin;
+  if (!origin) return next();
+  try {
+    const originHost = new URL(origin).host;
+    const reqHost = req.headers.host;
+    if (originHost !== reqHost) {
+      return res.status(403).json({ error: "Cross-origin request blocked" });
+    }
+  } catch {
+    return res.status(403).json({ error: "Invalid Origin header" });
+  }
+  return next();
 }
 
 function isPortAvailable(port: number): Promise<boolean> {
@@ -47,6 +85,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 async function startServer() {
   assertSessionSecret();
+  assertFieldEncryption();
 
   const app = express();
   const server = createServer(app);
@@ -88,6 +127,7 @@ async function startServer() {
   app.use(
     "/api/trpc",
     apiLimiter,
+    csrfGuard,
     createExpressMiddleware({
       router: appRouter,
       createContext,
