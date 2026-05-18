@@ -446,6 +446,37 @@ export const appRouter = router({
       return db.countNotificacoesNaoLidas();
     }),
   }),
+
+  // ==================== IMPORTAÇÃO AUTOMÁTICA ====================
+  importacao: router({
+    iniciar: adminProcedure
+      .input(
+        z.object({
+          termo: z.string().trim().min(2).max(120),
+          cidade: z.string().trim().min(2).max(120),
+          estado: z.string().trim().length(2),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const id = await db.createImportJob({
+          termo: input.termo,
+          cidade: input.cidade,
+          estado: input.estado.toUpperCase(),
+        });
+        return { id };
+      }),
+
+    listar: adminProcedure.query(async () => {
+      return db.listImportJobs(30);
+    }),
+
+    cancelar: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .mutation(async ({ input }) => {
+        await db.cancelImportJob(input.id);
+        return { success: true };
+      }),
+  }),
 });
 
 export type AppRouter = typeof appRouter;

@@ -2,7 +2,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Building2, LayoutDashboard, Store, Star, Users, Bell, LogOut, ChevronLeft, Headphones } from "lucide-react";
+import { Building2, LayoutDashboard, Store, Star, Users, Bell, LogOut, ChevronLeft, Headphones, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/atendimento", label: "Atendimento", icon: Headphones },
   { href: "/admin/oficinas", label: "Oficinas", icon: Store },
+  { href: "/admin/importar", label: "Importar", icon: Download },
   { href: "/admin/avaliacoes", label: "Avaliações", icon: Star },
   { href: "/admin/b2b", label: "Clientes B2B", icon: Users },
   { href: "/admin/notificacoes", label: "Notificações", icon: Bell },

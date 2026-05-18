@@ -12,6 +12,7 @@ import type { Request, Response, NextFunction } from "express";
 import { serveStatic, setupVite } from "./vite";
 import { isFieldEncryptionConfigured } from "./crypto";
 import { runMigrations } from "./migrate";
+import { startImportWorker } from "./oficinaImport";
 
 // Falha cedo se o segredo de sessão for ausente/fraco: com segredo fraco
 // qualquer pessoa forja o cookie de sessão (inclusive admin).
@@ -69,6 +70,7 @@ async function startServer() {
   assertFieldEncryption();
 
   await runMigrations();
+  startImportWorker();
 
   const app = express();
   const server = createServer(app);

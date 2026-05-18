@@ -1,6 +1,6 @@
-import { eq, and, like, or, sql, desc, asc, count } from "drizzle-orm";
+import { eq, and, like, or, sql, desc, asc, count, inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao } from "../drizzle/schema";
+import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao, importJobs, ImportJob, InsertImportJob } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { encryptOficinaFields, decryptOficinaFields } from './_core/crypto';
 import { cached, invalidatePrefix } from './_core/cache';
@@ -371,4 +371,76 @@ export async function updateUserRole(userId: number, role: "user" | "admin" | "o
   const db = await getDb();
   if (!db) return;
   await db.update(users).set({ role }).where(eq(users.id, userId));
+}
+
+// ==================== IMPORTAÇÃO (Google Places) ====================
+
+export async function oficinaExistsByGooglePlaceId(placeId: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db
+    .select({ id: oficinas.id })
+    .from(oficinas)
+    .where(eq(oficinas.googlePlaceId, placeId))
+    .limit(1);
+  return result.length > 0;
+}
+
+export async function insertImportedOficina(data: InsertOficina): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(oficinas).values(data);
+  invalidatePrefix(OFICINAS_CACHE_PREFIX);
+}
+
+export async function createImportJob(data: {
+  termo: string;
+  cidade: string;
+  estado: string;
+}): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const result = await db.insert(importJobs).values(data);
+  return result[0].insertId;
+}
+
+// Próximo job a processar: o mais antigo que ainda está pendente/rodando.
+export async function pickNextImportJob(): Promise<ImportJob | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db
+    .select()
+    .from(importJobs)
+    .where(inArray(importJobs.status, ["pendente", "rodando"]))
+    .orderBy(asc(importJobs.createdAt))
+    .limit(1);
+  return result[0] || undefined;
+}
+
+export async function updateImportJob(
+  id: number,
+  patch: Partial<InsertImportJob>
+): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(importJobs).set(patch).where(eq(importJobs.id, id));
+}
+
+export async function listImportJobs(limit = 30): Promise<ImportJob[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(importJobs)
+    .orderBy(desc(importJobs.createdAt))
+    .limit(limit);
+}
+
+export async function cancelImportJob(id: number): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db
+    .update(importJobs)
+    .set({ status: "cancelado" })
+    .where(and(eq(importJobs.id, id), inArray(importJobs.status, ["pendente", "rodando"])));
 }

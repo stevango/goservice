@@ -17,6 +17,7 @@ import AreaB2B from "./pages/AreaB2B";
 import OficinaDetalhe from "./pages/OficinaDetalhe";
 import MinhaOficina from "./pages/MinhaOficina";
 import AdminAtendimento from "./pages/admin/AdminAtendimento";
+import AdminImportar from "./pages/admin/AdminImportar";
 import Login from "./pages/Login";
 
 function Router() {
@@ -35,6 +36,7 @@ function Router() {
       <Route path="/admin/b2b" component={AdminB2B} />
       <Route path="/admin/notificacoes" component={AdminNotificacoes} />
       <Route path="/admin/atendimento" component={AdminAtendimento} />
+      <Route path="/admin/importar" component={AdminImportar} />
       <Route path="/b2b" component={AreaB2B} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

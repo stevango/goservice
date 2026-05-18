@@ -89,6 +89,9 @@ export const oficinas = mysqlTable("oficinas", {
   // Observações internas (admin)
   observacoesAdmin: text("observacoesAdmin"),
   
+  // Dedup de importação automática (Google Places)
+  googlePlaceId: varchar("googlePlaceId", { length: 128 }),
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 }, (t) => ({
@@ -97,6 +100,7 @@ export const oficinas = mysqlTable("oficinas", {
   userIdIdx: index("oficinas_user_id_idx").on(t.userId),
   estadoIdx: index("oficinas_estado_idx").on(t.estado),
   categoriaIdx: index("oficinas_categoria_idx").on(t.categoria),
+  googlePlaceIdIdx: index("oficinas_google_place_id_idx").on(t.googlePlaceId),
 }));
 
 export type Oficina = typeof oficinas.$inferSelect;
@@ -199,3 +203,36 @@ export const notificacoes = mysqlTable("notificacoes", {
 
 export type Notificacao = typeof notificacoes.$inferSelect;
 export type InsertNotificacao = typeof notificacoes.$inferInsert;
+
+/**
+ * Importação automática de oficinas (Google Places).
+ * Cada job é processado devagar, em lotes, de forma retomável.
+ */
+export const importJobs = mysqlTable("import_jobs", {
+  id: int("id").autoincrement().primaryKey(),
+  termo: varchar("termo", { length: 255 }).notNull(),
+  cidade: varchar("cidade", { length: 255 }).notNull(),
+  estado: varchar("estado", { length: 2 }).notNull(),
+  status: mysqlEnum("statusImport", [
+    "pendente",
+    "rodando",
+    "concluido",
+    "cancelado",
+    "erro",
+  ])
+    .default("pendente")
+    .notNull(),
+  nextPageToken: text("nextPageToken"),
+  pagina: int("pagina").default(0).notNull(),
+  encontrados: int("encontrados").default(0).notNull(),
+  importados: int("importados").default(0).notNull(),
+  duplicados: int("duplicados").default(0).notNull(),
+  erro: text("erro"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+}, (t) => ({
+  statusIdx: index("import_jobs_status_idx").on(t.status),
+}));
+
+export type ImportJob = typeof importJobs.$inferSelect;
+export type InsertImportJob = typeof importJobs.$inferInsert;
