@@ -11,6 +11,7 @@ import { createContext } from "./context";
 import type { Request, Response, NextFunction } from "express";
 import { serveStatic, setupVite } from "./vite";
 import { isFieldEncryptionConfigured } from "./crypto";
+import { runMigrations } from "./migrate";
 
 // Falha cedo se o segredo de sessão for ausente/fraco: com segredo fraco
 // qualquer pessoa forja o cookie de sessão (inclusive admin).
@@ -66,6 +67,8 @@ function csrfGuard(req: Request, res: Response, next: NextFunction) {
 async function startServer() {
   assertSessionSecret();
   assertFieldEncryption();
+
+  await runMigrations();
 
   const app = express();
   const server = createServer(app);

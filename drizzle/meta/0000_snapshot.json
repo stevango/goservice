@@ -1,8 +1,8 @@
 {
   "version": "5",
   "dialect": "mysql",
-  "id": "ce8cf64b-a62c-4485-83dc-0c7adb0f6c15",
-  "prevId": "95d4e5dc-8234-4936-8632-92a04ce323cc",
+  "id": "e509f526-8d9b-46a1-bf4a-cb16964860f3",
+  "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "avaliacoes": {
       "name": "avaliacoes",
