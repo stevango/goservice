@@ -397,6 +397,7 @@ export async function createImportJob(data: {
   termo: string;
   cidade: string;
   estado: string;
+  limite: number;
 }): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");

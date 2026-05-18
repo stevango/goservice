@@ -455,6 +455,7 @@ export const appRouter = router({
           termo: z.string().trim().min(2).max(120),
           cidade: z.string().trim().min(2).max(120),
           estado: z.string().trim().length(2),
+          limite: z.number().int().min(1).max(300),
         })
       )
       .mutation(async ({ input }) => {
@@ -462,6 +463,7 @@ export const appRouter = router({
           termo: input.termo,
           cidade: input.cidade,
           estado: input.estado.toUpperCase(),
+          limite: input.limite,
         });
         return { id };
       }),

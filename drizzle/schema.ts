@@ -222,6 +222,7 @@ export const importJobs = mysqlTable("import_jobs", {
   ])
     .default("pendente")
     .notNull(),
+  limite: int("limite").default(60).notNull(),
   nextPageToken: text("nextPageToken"),
   pagina: int("pagina").default(0).notNull(),
   encontrados: int("encontrados").default(0).notNull(),

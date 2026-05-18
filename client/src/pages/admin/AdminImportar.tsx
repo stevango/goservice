@@ -3,9 +3,17 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
+import { ESTADOS_BRASIL, ESTADOS_BRASIL_NOMES } from "@shared/types";
 import { Download, Loader2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const STATUS_STYLE: Record<string, string> = {
@@ -19,10 +27,13 @@ const STATUS_STYLE: Record<string, string> = {
 export default function AdminImportar() {
   const [form, setForm] = useState({
     termo: "oficina mecânica",
-    cidade: "",
     estado: "",
+    cidade: "",
+    limite: 60,
   });
-  const utils = trpc.useUtils();
+  const [cidades, setCidades] = useState<string[]>([]);
+  const [cidadesLoading, setCidadesLoading] = useState(false);
+  const [cidadesErro, setCidadesErro] = useState(false);
 
   const jobs = trpc.importacao.listar.useQuery(undefined, {
     refetchInterval: 15_000,
@@ -33,7 +44,7 @@ export default function AdminImportar() {
       toast.success(
         "Importação iniciada! Ela roda devagar (1 lote por minuto) em segundo plano."
       );
-      setForm({ ...form, cidade: "", estado: "" });
+      setForm(f => ({ ...f, cidade: "" }));
       jobs.refetch();
     },
     onError: e => toast.error(e.message),
@@ -46,6 +57,44 @@ export default function AdminImportar() {
     },
     onError: e => toast.error(e.message),
   });
+
+  // Ao trocar a UF, busca as cidades daquele estado no IBGE.
+  useEffect(() => {
+    if (!form.estado) {
+      setCidades([]);
+      setCidadesErro(false);
+      return;
+    }
+    const ctrl = new AbortController();
+    setCidadesLoading(true);
+    setCidadesErro(false);
+    setCidades([]);
+    fetch(
+      `https://servicodados.ibge.gov.br/api/v1/localidades/estados/${form.estado}/municipios?orderBy=nome`,
+      { signal: ctrl.signal }
+    )
+      .then(r => {
+        if (!r.ok) throw new Error(`IBGE ${r.status}`);
+        return r.json();
+      })
+      .then((data: Array<{ nome: string }>) => {
+        setCidades(data.map(m => m.nome));
+      })
+      .catch((err: unknown) => {
+        if ((err as Error).name === "AbortError") return;
+        setCidadesErro(true);
+      })
+      .finally(() => setCidadesLoading(false));
+    return () => ctrl.abort();
+  }, [form.estado]);
+
+  const podeIniciar =
+    form.termo.trim().length >= 2 &&
+    form.estado.length === 2 &&
+    form.cidade.trim().length >= 2 &&
+    form.limite >= 1 &&
+    form.limite <= 300 &&
+    !iniciar.isPending;
 
   return (
     <AdminLayout>
@@ -79,31 +128,95 @@ export default function AdminImportar() {
                 placeholder="oficina mecânica"
               />
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="estado">Estado (UF)</Label>
+              <Select
+                value={form.estado}
+                onValueChange={uf =>
+                  setForm({ ...form, estado: uf, cidade: "" })
+                }
+              >
+                <SelectTrigger id="estado" className="w-full">
+                  <SelectValue placeholder="Selecione o estado" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ESTADOS_BRASIL.map(uf => (
+                    <SelectItem key={uf} value={uf}>
+                      {ESTADOS_BRASIL_NOMES[uf]} ({uf})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="cidade">Cidade</Label>
-              <Input
-                id="cidade"
-                required
-                value={form.cidade}
-                onChange={e => setForm({ ...form, cidade: e.target.value })}
-                placeholder="Divinópolis"
-              />
+              {cidadesErro ? (
+                <Input
+                  id="cidade"
+                  required
+                  value={form.cidade}
+                  onChange={e =>
+                    setForm({ ...form, cidade: e.target.value })
+                  }
+                  placeholder="Digite a cidade"
+                  disabled={!form.estado}
+                />
+              ) : (
+                <Select
+                  value={form.cidade}
+                  onValueChange={c => setForm({ ...form, cidade: c })}
+                  disabled={!form.estado || cidadesLoading}
+                >
+                  <SelectTrigger id="cidade" className="w-full">
+                    <SelectValue
+                      placeholder={
+                        !form.estado
+                          ? "Escolha o estado antes"
+                          : cidadesLoading
+                            ? "Carregando cidades..."
+                            : "Selecione a cidade"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cidades.map(c => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
+
             <div className="space-y-2">
-              <Label htmlFor="estado">UF</Label>
+              <Label htmlFor="limite">Quantas oficinas buscar</Label>
               <Input
-                id="estado"
+                id="limite"
+                type="number"
+                min={1}
+                max={300}
                 required
-                maxLength={2}
-                value={form.estado}
+                value={form.limite}
                 onChange={e =>
-                  setForm({ ...form, estado: e.target.value.toUpperCase() })
+                  setForm({
+                    ...form,
+                    limite: Math.max(
+                      1,
+                      Math.min(300, Number(e.target.value) || 1)
+                    ),
+                  })
                 }
-                placeholder="MG"
               />
+              <p className="text-xs text-muted-foreground">
+                Máximo de 300 por cidade. A busca para ao atingir esse número.
+              </p>
             </div>
+
             <div className="md:col-span-4">
-              <Button type="submit" disabled={iniciar.isPending}>
+              <Button type="submit" disabled={!podeIniciar}>
                 {iniciar.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
@@ -137,8 +250,9 @@ export default function AdminImportar() {
                     {job.termo} — {job.cidade}/{job.estado}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Página {job.pagina} · {job.importados} importadas ·{" "}
-                    {job.duplicados} já existiam · {job.encontrados} vistas
+                    Página {job.pagina} · {job.importados}/{job.limite}{" "}
+                    importadas · {job.duplicados} já existiam ·{" "}
+                    {job.encontrados} vistas
                   </p>
                   {job.erro && (
                     <p className="text-xs text-red-600 mt-1">{job.erro}</p>

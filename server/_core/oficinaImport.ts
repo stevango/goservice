@@ -80,6 +80,14 @@ export async function processNextImportBatch(): Promise<void> {
     const job = await db.pickNextImportJob();
     if (!job) return;
 
+    if (job.importados >= job.limite) {
+      await db.updateImportJob(job.id, {
+        status: "concluido",
+        nextPageToken: null,
+      });
+      return;
+    }
+
     if (job.status === "pendente") {
       await db.updateImportJob(job.id, { status: "rodando" });
     }
@@ -120,6 +128,7 @@ export async function processNextImportBatch(): Promise<void> {
     let duplicados = job.duplicados;
 
     for (const place of results) {
+      if (importados >= job.limite) break;
       if (!place.place_id) continue;
       if (await db.oficinaExistsByGooglePlaceId(place.place_id)) {
         duplicados += 1;
@@ -135,10 +144,11 @@ export async function processNextImportBatch(): Promise<void> {
       }
     }
 
-    const hasMore = Boolean(resp.next_page_token);
+    const reachedLimit = importados >= job.limite;
+    const hasMore = Boolean(resp.next_page_token) && !reachedLimit;
     await db.updateImportJob(job.id, {
       status: hasMore ? "rodando" : "concluido",
-      nextPageToken: resp.next_page_token ?? null,
+      nextPageToken: hasMore ? resp.next_page_token ?? null : null,
       pagina: job.pagina + 1,
       encontrados: job.encontrados + results.length,
       importados,
