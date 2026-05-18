@@ -301,16 +301,22 @@ class SDKServer {
       throw ForbiddenError("User not found");
     }
 
-    await db.upsertUser({
-      openId: user.openId,
-      lastSignedIn: signedInAt,
-    });
+    // Evita uma escrita no banco a cada request: só atualiza lastSignedIn
+    // se a última for mais antiga que LAST_SEEN_THROTTLE_MS.
+    const lastSeen = user.lastSignedIn ? new Date(user.lastSignedIn).getTime() : 0;
+    if (signedInAt.getTime() - lastSeen > LAST_SEEN_THROTTLE_MS) {
+      await db.upsertUser({
+        openId: user.openId,
+        lastSignedIn: signedInAt,
+      });
+    }
 
     return user;
   }
 }
 
 const CRON_OPEN_ID_PREFIX = "cron_";
+const LAST_SEEN_THROTTLE_MS = 5 * 60 * 1000;
 
 /** Result of `sdk.authenticateRequest`. Cron callbacks set `isCron=true` and `taskUid`; see `references/periodic-updates.md`. */
 export type AuthenticatedUser = User & {

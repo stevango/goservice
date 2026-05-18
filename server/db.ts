@@ -123,6 +123,14 @@ export async function listOficinas(filters?: {
       )
     );
   }
+  // Filtra arrays JSON no banco (não na aplicação) para que paginação e
+  // contagem fiquem corretas.
+  if (filters?.tipoVeiculo) {
+    conditions.push(sql`JSON_CONTAINS(${oficinas.tiposVeiculos}, ${JSON.stringify(filters.tipoVeiculo)})`);
+  }
+  if (filters?.tipoServico) {
+    conditions.push(sql`JSON_CONTAINS(${oficinas.tiposServicos}, ${JSON.stringify(filters.tipoServico)})`);
+  }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
   const limit = filters?.limit || 50;
@@ -133,22 +141,7 @@ export async function listOficinas(filters?: {
     db.select({ count: count() }).from(oficinas).where(where)
   ]);
 
-  // Filter by JSON fields in application layer
-  let filtered = rows;
-  if (filters?.tipoVeiculo) {
-    filtered = filtered.filter(o => {
-      const tipos = o.tiposVeiculos as string[] | null;
-      return tipos?.includes(filters.tipoVeiculo!);
-    });
-  }
-  if (filters?.tipoServico) {
-    filtered = filtered.filter(o => {
-      const tipos = o.tiposServicos as string[] | null;
-      return tipos?.includes(filters.tipoServico!);
-    });
-  }
-
-  return { oficinas: filtered, total: totalResult[0]?.count || 0 };
+  return { oficinas: rows, total: totalResult[0]?.count || 0 };
 }
 
 export async function listOficinasPublic(filters?: {

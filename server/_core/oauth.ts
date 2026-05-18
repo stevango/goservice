@@ -23,6 +23,14 @@ function parseState(state: string): { redirectUri: string; returnPath: string } 
   return { redirectUri: Buffer.from(state, "base64").toString("utf-8"), returnPath: "/" };
 }
 
+// Evita open redirect: só aceita caminho interno absoluto (/...), nunca
+// URL absoluta, protocol-relative (//host) ou backslash.
+function safeReturnPath(returnPath: string | undefined): string {
+  if (!returnPath || !returnPath.startsWith("/")) return "/";
+  if (returnPath.startsWith("//") || returnPath.startsWith("/\\")) return "/";
+  return returnPath;
+}
+
 export function registerOAuthRoutes(app: Express) {
   app.get("/api/oauth/callback", async (req: Request, res: Response) => {
     const code = getQueryParam(req, "code");
@@ -59,7 +67,7 @@ export function registerOAuthRoutes(app: Express) {
       res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
 
       const { returnPath } = parseState(state);
-      res.redirect(302, returnPath || "/");
+      res.redirect(302, safeReturnPath(returnPath));
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });

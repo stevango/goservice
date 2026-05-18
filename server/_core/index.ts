@@ -1,5 +1,7 @@
 import "dotenv/config";
 import express from "express";
+import helmet from "helmet";
+import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -8,6 +10,21 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+
+// Falha cedo se o segredo de sessão for ausente/fraco: com segredo fraco
+// qualquer pessoa forja o cookie de sessão (inclusive admin).
+function assertSessionSecret() {
+  const secret = process.env.JWT_SECRET ?? "";
+  if (secret.length < 32) {
+    const msg =
+      "[Security] JWT_SECRET ausente ou fraco (<32 chars). Gere um segredo " +
+      "aleatório forte (ex.: `openssl rand -base64 48`) e configure JWT_SECRET.";
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(msg);
+    }
+    console.warn(msg);
+  }
+}
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -29,16 +46,48 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 }
 
 async function startServer() {
+  assertSessionSecret();
+
   const app = express();
   const server = createServer(app);
+
+  // Necessário para o rate limiter enxergar o IP real atrás do proxy.
+  app.set("trust proxy", 1);
+
+  // Cabeçalhos de segurança. CSP/COEP ficam desligados por ora: precisam
+  // de tuning fino com Google Maps/analytics/Vite antes de habilitar.
+  app.use(
+    helmet({
+      contentSecurityPolicy: false,
+      crossOriginEmbedderPolicy: false,
+    })
+  );
+
+  // Rate limiting básico (anti-abuso/DoS). Limites generosos para não
+  // quebrar UX; ajustar conforme tráfego real.
+  const apiLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 1000,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+  });
+  const oauthLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    limit: 20,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+  });
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   registerStorageProxy(app);
+  app.use("/api/oauth", oauthLimiter);
   registerOAuthRoutes(app);
   // tRPC API
   app.use(
     "/api/trpc",
+    apiLimiter,
     createExpressMiddleware({
       router: appRouter,
       createContext,

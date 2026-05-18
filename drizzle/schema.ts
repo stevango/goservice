@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, index } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -90,7 +90,13 @@ export const oficinas = mysqlTable("oficinas", {
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ({
+  // Listagem pública/admin: filtra por status e ordena por reputação
+  statusScoreIdx: index("oficinas_status_score_idx").on(t.status, t.scoreReputacao),
+  userIdIdx: index("oficinas_user_id_idx").on(t.userId),
+  estadoIdx: index("oficinas_estado_idx").on(t.estado),
+  categoriaIdx: index("oficinas_categoria_idx").on(t.categoria),
+}));
 
 export type Oficina = typeof oficinas.$inferSelect;
 export type InsertOficina = typeof oficinas.$inferInsert;
@@ -105,7 +111,9 @@ export const oficinaDocumentos = mysqlTable("oficina_documentos", {
   url: varchar("url", { length: 1000 }).notNull(),
   nome: varchar("nome", { length: 255 }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  oficinaIdIdx: index("oficina_documentos_oficina_id_idx").on(t.oficinaId),
+}));
 
 export type OficinaDocumento = typeof oficinaDocumentos.$inferSelect;
 export type InsertOficinaDocumento = typeof oficinaDocumentos.$inferInsert;
@@ -133,9 +141,14 @@ export const avaliacoes = mysqlTable("avaliacoes", {
   tipoVeiculo: varchar("tipoVeiculo", { length: 100 }),
   
   status: mysqlEnum("statusAvaliacao", ["pendente", "aprovada", "rejeitada"]).default("pendente").notNull(),
-  
+
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  // listAvaliacoes / recalcularScore filtram por oficina (+status)
+  oficinaStatusIdx: index("avaliacoes_oficina_status_idx").on(t.oficinaId, t.status),
+  // listAllAvaliacoes: filtra por status e ordena por data
+  statusCreatedIdx: index("avaliacoes_status_created_idx").on(t.status, t.createdAt),
+}));
 
 export type Avaliacao = typeof avaliacoes.$inferSelect;
 export type InsertAvaliacao = typeof avaliacoes.$inferInsert;
@@ -160,7 +173,9 @@ export const clientesB2B = mysqlTable("clientes_b2b", {
   
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-});
+}, (t) => ({
+  userIdIdx: index("clientes_b2b_user_id_idx").on(t.userId),
+}));
 
 export type ClienteB2B = typeof clientesB2B.$inferSelect;
 export type InsertClienteB2B = typeof clientesB2B.$inferInsert;
@@ -176,7 +191,10 @@ export const notificacoes = mysqlTable("notificacoes", {
   lida: boolean("lida").default(false),
   dados: json("dados").$type<Record<string, unknown>>(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-});
+}, (t) => ({
+  // Listagem por data e contagem de não lidas
+  lidaCreatedIdx: index("notificacoes_lida_created_idx").on(t.lida, t.createdAt),
+}));
 
 export type Notificacao = typeof notificacoes.$inferSelect;
 export type InsertNotificacao = typeof notificacoes.$inferInsert;
