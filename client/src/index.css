@@ -3,11 +3,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-@font-face {
-  font-family: "Inter";
-  src: url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap");
-}
-
 @theme inline {
   --color-background: oklch(0.99 0 0);
   --color-foreground: oklch(0.15 0.01 260);
