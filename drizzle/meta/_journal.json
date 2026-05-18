@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1778914163894,
+      "tag": "0000_clean_jackpot",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1778914332997,
+      "tag": "0001_messy_the_enforcers",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1778918214412,
+      "tag": "0002_old_human_cannonball",
+      "breakpoints": true
+    }
+  ]
+}
