@@ -5,6 +5,16 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
+import type { User } from "../drizzle/schema";
+import { hashPassword, verifyPassword } from "./_core/password";
+import { setSessionCookie } from "./_core/session";
+import { ENV } from "./_core/env";
+
+// Nunca devolve o hash de senha pro cliente.
+function publicUser(user: User): Omit<User, "passwordHash"> {
+  const { passwordHash: _omit, ...rest } = user;
+  return rest;
+}
 
 // Admin-only middleware
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
@@ -25,12 +35,92 @@ const b2bProcedure = protectedProcedure.use(async ({ ctx, next }) => {
 export const appRouter = router({
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts =>
+      opts.ctx.user ? publicUser(opts.ctx.user) : null
+    ),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
       return { success: true } as const;
     }),
+    register: publicProcedure
+      .input(
+        z.object({
+          name: z.string().trim().min(2).max(120),
+          email: z.string().trim().email().max(255),
+          password: z.string().min(8).max(200),
+          tipo: z.enum(["oficina", "b2b", "cliente"]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const email = input.email.toLowerCase();
+        const openId = `local:${email}`;
+
+        const existing = await db.getUserByOpenId(openId);
+        if (existing) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Já existe uma conta com esse e-mail.",
+          });
+        }
+
+        const role =
+          ENV.adminEmail && email === ENV.adminEmail
+            ? "admin"
+            : input.tipo === "cliente"
+              ? "user"
+              : input.tipo;
+
+        await db.createUserWithPassword({
+          openId,
+          email,
+          name: input.name,
+          passwordHash: await hashPassword(input.password),
+          role,
+        });
+
+        const user = await db.getUserByOpenId(openId);
+        if (!user) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Falha ao criar a conta. Tente novamente.",
+          });
+        }
+
+        await setSessionCookie(ctx, user);
+        return publicUser(user);
+      }),
+    login: publicProcedure
+      .input(
+        z.object({
+          email: z.string().trim().email().max(255),
+          password: z.string().min(1).max(200),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const email = input.email.toLowerCase();
+        const user = await db.getUserByOpenId(`local:${email}`);
+
+        if (
+          !user ||
+          !user.passwordHash ||
+          !(await verifyPassword(input.password, user.passwordHash))
+        ) {
+          throw new TRPCError({
+            code: "UNAUTHORIZED",
+            message: "E-mail ou senha inválidos.",
+          });
+        }
+
+        // Promove a admin se este e-mail estiver configurado como dono.
+        if (ENV.adminEmail && email === ENV.adminEmail && user.role !== "admin") {
+          await db.updateUserRole(user.id, "admin");
+          user.role = "admin";
+        }
+
+        await setSessionCookie(ctx, user);
+        return publicUser(user);
+      }),
   }),
 
   // ==================== OFICINAS ====================

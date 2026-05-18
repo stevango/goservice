@@ -17,11 +17,13 @@ import AreaB2B from "./pages/AreaB2B";
 import OficinaDetalhe from "./pages/OficinaDetalhe";
 import MinhaOficina from "./pages/MinhaOficina";
 import AdminAtendimento from "./pages/admin/AdminAtendimento";
+import Login from "./pages/Login";
 
 function Router() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      <Route path="/login" component={Login} />
       <Route path="/buscar" component={BuscarOficinas} />
       <Route path="/oficina/:id" component={OficinaDetalhe} />
       <Route path="/cadastro" component={CadastroOficina} />

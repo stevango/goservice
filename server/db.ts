@@ -74,6 +74,26 @@ export async function getUserByOpenId(openId: string) {
   return result.length > 0 ? result[0] : undefined;
 }
 
+export async function createUserWithPassword(data: {
+  openId: string;
+  email: string;
+  name: string;
+  passwordHash: string;
+  role: "user" | "admin" | "oficina" | "b2b";
+}): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  await db.insert(users).values({
+    openId: data.openId,
+    email: data.email,
+    name: data.name,
+    passwordHash: data.passwordHash,
+    loginMethod: "password",
+    role: data.role,
+    lastSignedIn: new Date(),
+  });
+}
+
 // ==================== OFICINAS ====================
 
 export async function createOficina(data: InsertOficina) {
