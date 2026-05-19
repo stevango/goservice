@@ -9,13 +9,15 @@ import { Link } from "wouter";
 import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock, Globe, Image as ImageIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, segmentoLabel } from "@shared/types";
+import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, segmentoLabel, traduzHorario } from "@shared/types";
 import { OsmMap } from "@/components/OsmMap";
+import { Lightbox } from "@/components/Lightbox";
 
 export default function AdminOficinaDetalhe() {
   const params = useParams<{ id: string }>();
   const id = Number(params.id);
   const [observacoes, setObservacoes] = useState("");
+  const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
 
   const { data, isLoading, refetch } = trpc.oficinas.detalheAdmin.useQuery({ id });
   const alterarStatus = trpc.oficinas.alterarStatus.useMutation({
@@ -33,6 +35,7 @@ export default function AdminOficinaDetalhe() {
 
   const categoriaInfo = CATEGORIAS_OFICINA.find(c => c.value === data.categoria);
   const fornecePecasInfo = FORNECE_PECAS_OPTIONS.find(f => f.value === data.fornecePecas);
+  const fotos = (data.documentos || []).filter(d => d.tipo.startsWith("foto"));
 
   return (
     <AdminLayout>
@@ -179,7 +182,7 @@ export default function AdminOficinaDetalhe() {
           <CardContent className="text-sm">
             {data.horarioFuncionamento ? (
               <div className="space-y-0.5">
-                {data.horarioFuncionamento.split("\n").map((linha, i) => (
+                {traduzHorario(data.horarioFuncionamento).split("\n").map((linha, i) => (
                   <p key={i} className="text-muted-foreground">{linha}</p>
                 ))}
               </div>
@@ -201,20 +204,22 @@ export default function AdminOficinaDetalhe() {
         <Card className="lg:col-span-2">
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Galeria</CardTitle></CardHeader>
           <CardContent>
-            {(() => {
-              const fotos = (data.documentos || []).filter(d => d.tipo.startsWith("foto"));
-              return fotos.length > 0 ? (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {fotos.map(f => (
-                    <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-lg overflow-hidden border">
-                      <img src={f.url} alt={f.nome || "Foto"} className="w-full h-full object-cover" loading="lazy" />
-                    </a>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">Nenhuma foto importada.</p>
-              );
-            })()}
+            {fotos.length > 0 ? (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                {fotos.map((f, idx) => (
+                  <button
+                    key={f.id}
+                    type="button"
+                    onClick={() => setLightboxIdx(idx)}
+                    className="block aspect-square rounded-lg overflow-hidden border cursor-zoom-in"
+                  >
+                    <img src={f.url} alt={f.nome || "Foto"} className="w-full h-full object-cover" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Nenhuma foto importada.</p>
+            )}
           </CardContent>
         </Card>
 
@@ -262,6 +267,13 @@ export default function AdminOficinaDetalhe() {
           </CardContent>
         </Card>
       )}
+
+      <Lightbox
+        fotos={fotos}
+        index={lightboxIdx}
+        onClose={() => setLightboxIdx(null)}
+        onChange={setLightboxIdx}
+      />
     </AdminLayout>
   );
 }

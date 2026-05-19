@@ -8,7 +8,7 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { useParams } from "wouter";
 import { MapPin, Star, Phone, Mail, Globe, Clock, CreditCard, Wrench, Car, MessageSquare, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
-import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS } from "@shared/types";
+import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, traduzHorario } from "@shared/types";
 import { OsmMap } from "@/components/OsmMap";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -195,7 +195,7 @@ export default function OficinaDetalhe() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    {oficina.horarioFuncionamento.split('|').map((horario, idx) => (
+                    {traduzHorario(oficina.horarioFuncionamento).split("\n").map((horario, idx) => (
                       <div key={idx} className="text-sm">
                         <span className="font-medium">{horario.trim()}</span>
                       </div>

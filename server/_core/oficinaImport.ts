@@ -100,7 +100,7 @@ async function fetchDetails(placeId: string): Promise<ParsedDetails | null> {
   try {
     const { result } = await makeRequest<PlaceDetailsResult>(
       "/maps/api/place/details/json",
-      { place_id: placeId, fields: DETAILS_FIELDS }
+      { place_id: placeId, fields: DETAILS_FIELDS, language: "pt-BR" }
     );
     if (!result) return null;
 

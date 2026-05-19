@@ -60,6 +60,48 @@ export function segmentoLabel(value: string | null | undefined): string {
   return (value && SEGMENTO_INFO[value]?.label) || value || "—";
 }
 
+// Traduz o horário do Google (weekday_text) para PT-BR na exibição.
+// Cobre dados já salvos em inglês sem precisar re-enriquecer.
+const DIAS_EN_PT: Record<string, string> = {
+  Monday: "Segunda-feira",
+  Tuesday: "Terça-feira",
+  Wednesday: "Quarta-feira",
+  Thursday: "Quinta-feira",
+  Friday: "Sexta-feira",
+  Saturday: "Sábado",
+  Sunday: "Domingo",
+};
+
+function horaPara24h(texto: string): string {
+  return texto.replace(
+    /(\d{1,2}):(\d{2})\s?(AM|PM)/g,
+    (_all, h: string, mm: string, ap: string) => {
+      let hour = parseInt(h, 10) % 12;
+      if (ap === "PM") hour += 12;
+      return `${String(hour).padStart(2, "0")}:${mm}`;
+    }
+  );
+}
+
+export function traduzHorario(
+  texto: string | null | undefined
+): string {
+  if (!texto) return "";
+  return texto
+    .split("\n")
+    .map(linha => {
+      let l = linha;
+      for (const [en, pt] of Object.entries(DIAS_EN_PT)) {
+        l = l.replace(new RegExp(`\\b${en}\\b`, "g"), pt);
+      }
+      l = l
+        .replace(/\bClosed\b/g, "Fechado")
+        .replace(/\bOpen 24 hours\b/g, "Aberto 24 horas");
+      return horaPara24h(l);
+    })
+    .join("\n");
+}
+
 export const TIPOS_VEICULOS = [
   { value: "leve", label: "Veículo Leve" },
   { value: "pesado", label: "Veículo Pesado" },
