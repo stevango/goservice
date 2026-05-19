@@ -10,6 +10,7 @@ import type { User } from "../drizzle/schema";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { setSessionCookie } from "./_core/session";
 import { ENV } from "./_core/env";
+import { kickImportWorker } from "./_core/oficinaImport";
 
 // Nunca devolve o hash de senha pro cliente.
 function publicUser(user: User): Omit<User, "passwordHash"> {
@@ -468,6 +469,7 @@ export const appRouter = router({
           estado: input.estado.toUpperCase(),
           limite: input.limite,
         });
+        kickImportWorker(); // começa já, sem esperar o ciclo
         return { id };
       }),
 

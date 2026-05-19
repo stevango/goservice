@@ -43,7 +43,7 @@ export default function AdminImportar() {
   const [cidadesErro, setCidadesErro] = useState(false);
 
   const jobs = trpc.importacao.listar.useQuery(undefined, {
-    refetchInterval: 15_000,
+    refetchInterval: 4_000,
   });
 
   const iniciar = trpc.importacao.iniciar.useMutation({

@@ -28,8 +28,7 @@ type Candidato = {
   endereco?: string;
 };
 
-const TICK_MS = 60_000;
-const INSERT_PER_TICK = 8; // insere os melhores aos poucos, sem travar
+const TICK_MS = 60_000; // ciclo de segurança / re-enriquecimento em background
 const ENRICH_PER_TICK = 5; // re-enriquece antigas quando não há import ativo
 let workerStarted = false;
 let isRunning = false;
@@ -285,105 +284,86 @@ async function runReenrichPass(): Promise<void> {
   }
 }
 
-// Fase 1: coleta todas as páginas do Text Search (sem inserir ainda).
-async function collectPage(
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+// Processa o job INTEIRO em uma única passada: busca as páginas
+// necessárias, ranqueia por avaliação e insere até o limite. Rápido
+// (10 estabelecimentos em ~segundos), não espalhado por ciclos.
+async function processJobFully(
   job: Awaited<ReturnType<typeof db.pickNextImportJob>> & object
 ): Promise<void> {
-  // Encerra a coleta: ranqueia (melhor avaliação primeiro), corta no
-  // limite e passa para a fase de inserção.
-  async function finalize(acc: Candidato[]): Promise<void> {
-    acc.sort((a, b) => b.rating - a.rating || b.urt - a.urt);
-    await db.updateImportJob(job.id, {
-      status: "rodando",
-      fase: "inserindo",
-      candidatos: acc.slice(0, job.limite),
-      nextPageToken: null,
-      pagina: job.pagina + 1,
-      encontrados: acc.length,
-      erro: null,
-    });
-  }
-
-  const params: Record<string, unknown> = job.nextPageToken
-    ? { pagetoken: job.nextPageToken }
-    : { query: `${job.termo} em ${job.cidade}, ${job.estado}, Brasil` };
-
-  let resp: TextSearchResponse;
-  try {
-    resp = await makeRequest<TextSearchResponse>(
-      "/maps/api/place/textsearch/json",
-      params
-    );
-  } catch (error) {
-    await db.updateImportJob(job.id, {
-      status: "erro",
-      erro: `Falha na busca Google: ${String(error)}`,
-    });
-    return;
-  }
-
-  // Token de paginação recusado: a 1 ciclo/min ele já deveria estar
-  // ativo, então isso significa token expirado/desabilitado (comum em
-  // projetos novos do Google). Em vez de repetir pra sempre, finaliza
-  // com o que já coletamos — garante progresso e nada de travar.
-  if (resp.status === "INVALID_REQUEST" && job.nextPageToken) {
-    await finalize([...(job.candidatos ?? [])]);
-    return;
-  }
-
-  if (resp.status !== "OK" && resp.status !== "ZERO_RESULTS") {
-    await db.updateImportJob(job.id, {
-      status: "erro",
-      erro: `Google retornou ${resp.status}${resp.error_message ? `: ${resp.error_message}` : ""}`,
-    });
-    return;
-  }
-
-  const results = resp.results ?? [];
   const acc: Candidato[] = [...(job.candidatos ?? [])];
   const seen = new Set(acc.map(c => c.placeId));
-  for (const r of results) {
-    if (!r.place_id || seen.has(r.place_id)) continue;
-    seen.add(r.place_id);
-    acc.push({
-      placeId: r.place_id,
-      nome: r.name,
-      rating: typeof r.rating === "number" ? r.rating : 0,
-      urt: typeof r.user_ratings_total === "number" ? r.user_ratings_total : 0,
-      lat: r.geometry?.location?.lat,
-      lng: r.geometry?.location?.lng,
-      endereco: r.formatted_address,
-    });
+
+  if (job.fase === "coletando") {
+    let token = job.nextPageToken;
+    // 1 página = 20 resultados. Só pagina se o limite exigir mais.
+    const maxPages = Math.min(3, Math.ceil(job.limite / 20) + 1);
+    let pages = 0;
+
+    while (acc.length < job.limite && pages < maxPages) {
+      const params: Record<string, unknown> = token
+        ? { pagetoken: token }
+        : { query: `${job.termo} em ${job.cidade}, ${job.estado}, Brasil` };
+
+      let resp: TextSearchResponse;
+      try {
+        resp = await makeRequest<TextSearchResponse>(
+          "/maps/api/place/textsearch/json",
+          params
+        );
+      } catch (error) {
+        await db.updateImportJob(job.id, {
+          status: "erro",
+          erro: `Falha na busca Google: ${String(error)}`,
+        });
+        return;
+      }
+
+      // Token de paginação recusado: usa o que já temos, sem travar.
+      if (resp.status === "INVALID_REQUEST" && token) break;
+
+      if (resp.status !== "OK" && resp.status !== "ZERO_RESULTS") {
+        await db.updateImportJob(job.id, {
+          status: "erro",
+          erro: `Google retornou ${resp.status}${resp.error_message ? `: ${resp.error_message}` : ""}`,
+        });
+        return;
+      }
+
+      for (const r of resp.results ?? []) {
+        if (!r.place_id || seen.has(r.place_id)) continue;
+        seen.add(r.place_id);
+        acc.push({
+          placeId: r.place_id,
+          nome: r.name,
+          rating: typeof r.rating === "number" ? r.rating : 0,
+          urt:
+            typeof r.user_ratings_total === "number"
+              ? r.user_ratings_total
+              : 0,
+          lat: r.geometry?.location?.lat,
+          lng: r.geometry?.location?.lng,
+          endereco: r.formatted_address,
+        });
+      }
+
+      pages += 1;
+      token = resp.next_page_token ?? null;
+      if (!token || acc.length >= job.limite) break;
+      await sleep(2500); // next_page_token leva ~2s pra ativar
+    }
+
+    acc.sort((a, b) => b.rating - a.rating || b.urt - a.urt);
   }
 
-  if (resp.next_page_token) {
-    await db.updateImportJob(job.id, {
-      status: "rodando",
-      candidatos: acc,
-      nextPageToken: resp.next_page_token,
-      pagina: job.pagina + 1,
-      encontrados: acc.length,
-      erro: null,
-    });
-    return;
-  }
-
-  await finalize(acc);
-}
-
-// Fase 2: insere os melhores aos poucos.
-async function insertBatch(
-  job: Awaited<ReturnType<typeof db.pickNextImportJob>> & object
-): Promise<void> {
-  const queue: Candidato[] = [...(job.candidatos ?? [])];
+  // Insere os melhores até o limite, tudo de uma vez.
+  const fila = acc.slice(0, job.limite);
   let importados = job.importados;
   let duplicados = job.duplicados;
-  let processed = 0;
 
-  while (queue.length > 0 && processed < INSERT_PER_TICK) {
+  for (const cand of fila) {
     if (importados >= job.limite) break;
-    const cand = queue.shift()!;
-    processed += 1;
     try {
       if (await db.oficinaExistsByGooglePlaceId(cand.placeId)) {
         duplicados += 1;
@@ -403,10 +383,13 @@ async function insertBatch(
     }
   }
 
-  const done = queue.length === 0 || importados >= job.limite;
   await db.updateImportJob(job.id, {
-    status: done ? "concluido" : "rodando",
-    candidatos: queue,
+    status: "concluido",
+    fase: "inserindo",
+    candidatos: [],
+    nextPageToken: null,
+    pagina: job.pagina + 1,
+    encontrados: acc.length,
     importados,
     duplicados,
     erro: null,
@@ -435,14 +418,18 @@ export async function processNextImportBatch(): Promise<void> {
       return;
     }
 
-    if (job.fase === "coletando") {
-      await collectPage(job);
-    } else {
-      await insertBatch(job);
-    }
+    await processJobFully(job);
   } finally {
     isRunning = false;
   }
+}
+
+// Dispara o worker imediatamente (ex.: logo após criar um job), sem
+// esperar o próximo ciclo. Fire-and-forget.
+export function kickImportWorker(): void {
+  processNextImportBatch().catch(error =>
+    console.error("[Import] Erro no ciclo de importação:", error)
+  );
 }
 
 export function startImportWorker(): void {
@@ -453,5 +440,5 @@ export function startImportWorker(): void {
       console.error("[Import] Erro no ciclo de importação:", error)
     );
   }, TICK_MS);
-  console.log("[Import] Worker de importação iniciado (1 ciclo/min).");
+  console.log("[Import] Worker de importação iniciado.");
 }
