@@ -154,6 +154,35 @@ async function fetchDetails(placeId: string): Promise<ParsedDetails | null> {
   }
 }
 
+export type GoogleReview = {
+  autor: string;
+  nota: number;
+  texto: string;
+  quando: string;
+};
+
+// Busca as avaliações do Google sob demanda. O Google retorna no
+// máximo ~5 reviews por estabelecimento (limite da API, não nosso).
+export async function fetchGoogleReviews(
+  placeId: string
+): Promise<GoogleReview[]> {
+  try {
+    const { result } = await makeRequest<PlaceDetailsResult>(
+      "/maps/api/place/details/json",
+      { place_id: placeId, fields: "reviews", language: "pt-BR" }
+    );
+    return (result?.reviews ?? []).map(r => ({
+      autor: r.author_name,
+      nota: r.rating,
+      texto: r.text,
+      quando: r.relative_time_description ?? "",
+    }));
+  } catch (error) {
+    console.warn("[Reviews] Falha ao buscar avaliações Google:", error);
+    return [];
+  }
+}
+
 function defaultDescricao(
   segmento: string,
   cidade: string,

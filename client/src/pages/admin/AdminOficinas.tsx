@@ -4,9 +4,10 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import { Search, Eye, CheckCircle2, XCircle, Clock, Ban } from "lucide-react";
+import { Search, Eye, CheckCircle2, XCircle, Clock, Ban, Star, Loader2 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ESTADOS_BRASIL, SEGMENTOS, segmentoLabel } from "@shared/types";
@@ -16,6 +17,12 @@ export default function AdminOficinas() {
   const [status, setStatus] = useState("");
   const [estado, setEstado] = useState("");
   const [segmento, setSegmento] = useState("");
+  const [reviewsFor, setReviewsFor] = useState<{ id: number; nome: string } | null>(null);
+
+  const reviewsQ = trpc.oficinas.googleReviews.useQuery(
+    { id: reviewsFor?.id ?? 0 },
+    { enabled: !!reviewsFor }
+  );
 
   const { data, isLoading, refetch } = trpc.oficinas.listarAdmin.useQuery({
     search: search || undefined,
@@ -125,7 +132,19 @@ export default function AdminOficinas() {
                   </TableCell>
                   <TableCell>{statusBadge(oficina.status)}</TableCell>
                   <TableCell className="text-sm font-medium">{Number(oficina.scoreReputacao).toFixed(1)}</TableCell>
-                  <TableCell className="text-sm">{oficina.totalAvaliacoes ?? 0}</TableCell>
+                  <TableCell className="text-sm">
+                    {(oficina.totalAvaliacoes ?? 0) > 0 ? (
+                      <button
+                        type="button"
+                        onClick={() => setReviewsFor({ id: oficina.id, nome: oficina.nomeFantasia })}
+                        className="text-blue-600 hover:underline font-medium"
+                      >
+                        {oficina.totalAvaliacoes}
+                      </button>
+                    ) : (
+                      0
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Link href={`/admin/oficinas/${oficina.id}`}>
@@ -165,6 +184,61 @@ export default function AdminOficinas() {
           </TableBody>
         </Table>
       </div>
+
+      <Dialog open={!!reviewsFor} onOpenChange={o => !o && setReviewsFor(null)}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Avaliações no Google — {reviewsFor?.nome}</DialogTitle>
+          </DialogHeader>
+          {reviewsQ.isLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : !reviewsQ.data || reviewsQ.data.reviews.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-8 text-center">
+              O Google não retornou avaliações para este estabelecimento.
+            </p>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-xs text-muted-foreground">
+                O Google fornece no máximo 5 avaliações pela API.
+                {reviewsQ.data.placeId && (
+                  <>
+                    {" "}
+                    <a
+                      href={`https://www.google.com/maps/place/?q=place_id:${reviewsQ.data.placeId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-600 hover:underline"
+                    >
+                      Ver todas no Google →
+                    </a>
+                  </>
+                )}
+              </p>
+              {reviewsQ.data.reviews.map((r, i) => (
+                <div key={i} className="border rounded-lg p-3">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="font-medium text-sm">{r.autor}</span>
+                    <span className="flex items-center gap-0.5 text-amber-500 text-xs">
+                      {Array.from({ length: 5 }).map((_, s) => (
+                        <Star
+                          key={s}
+                          className={`w-3.5 h-3.5 ${s < r.nota ? "fill-amber-400 text-amber-400" : "text-gray-300"}`}
+                        />
+                      ))}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mb-1">{r.quando}</p>
+                  <p className="text-sm text-foreground/90 whitespace-pre-line">
+                    {r.texto || <span className="text-muted-foreground italic">Sem comentário escrito.</span>}
+                  </p>
+                </div>
+              ))}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </AdminLayout>
   );
 }

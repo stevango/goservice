@@ -10,7 +10,7 @@ import type { User } from "../drizzle/schema";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { setSessionCookie } from "./_core/session";
 import { ENV } from "./_core/env";
-import { kickImportWorker } from "./_core/oficinaImport";
+import { kickImportWorker, fetchGoogleReviews } from "./_core/oficinaImport";
 
 // Nunca devolve o hash de senha pro cliente.
 function publicUser(user: User): Omit<User, "passwordHash"> {
@@ -279,6 +279,15 @@ export const appRouter = router({
       const avs = await db.listAvaliacoes(input.id);
       return { ...oficina, documentos: docs, avaliacoes: avs };
     }),
+
+    googleReviews: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const oficina = await db.getOficinaById(input.id);
+        if (!oficina?.googlePlaceId) return { reviews: [], placeId: null };
+        const reviews = await fetchGoogleReviews(oficina.googlePlaceId);
+        return { reviews, placeId: oficina.googlePlaceId };
+      }),
   }),
 
   // ==================== AVALIAÇÕES ====================
