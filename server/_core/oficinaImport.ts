@@ -91,7 +91,7 @@ type ParsedDetails = {
   horarioFuncionamento?: string;
   latitude?: string;
   longitude?: string;
-  photoRef?: string;
+  photoRefs?: string[];
 };
 
 // Busca o Place Details e normaliza os campos que nos interessam. É a
@@ -131,7 +131,10 @@ async function fetchDetails(placeId: string): Promise<ParsedDetails | null> {
       ),
       estado: ufComp && ufComp.length === 2 ? ufComp : undefined,
       cep: clamp(pickComponent(comps, ["postal_code"]), 9),
-      photoRef: result.photos?.[0]?.photo_reference,
+      photoRefs: (result.photos ?? [])
+        .slice(0, 10)
+        .map(p => p.photo_reference)
+        .filter(Boolean),
     };
     if (typeof result.rating === "number") {
       parsed.scoreReputacao = result.rating.toFixed(1);
@@ -196,7 +199,7 @@ async function buildOficina(
   cidade: string,
   estado: string,
   segmento: string
-): Promise<{ oficina: InsertOficina; photoRef?: string }> {
+): Promise<{ oficina: InsertOficina; photoRefs?: string[] }> {
   const nome = clamp(cand.nome, 255) || "Prestador (sem nome)";
   const oficina: InsertOficina = {
     cnpj: "",
@@ -236,21 +239,35 @@ async function buildOficina(
     if (d.latitude) oficina.latitude = d.latitude;
     if (d.longitude) oficina.longitude = d.longitude;
   }
-  return { oficina, photoRef: d?.photoRef };
+  return { oficina, photoRefs: d?.photoRefs };
 }
 
-async function saveFachadaFoto(
+// Salva várias fotos do Google. Idempotente: não duplica refs já
+// salvos (útil no re-enriquecimento). 1ª vira fachada, demais interior.
+async function saveFotos(
   oficinaId: number,
-  photoRef: string
+  refs: string[]
 ): Promise<void> {
+  if (!refs.length) return;
   const docs = await db.listDocumentos(oficinaId);
-  if (docs.some(doc => doc.tipo === "foto_fachada")) return;
-  await db.addDocumento({
-    oficinaId,
-    tipo: "foto_fachada",
-    url: `/api/place-photo?ref=${encodeURIComponent(photoRef)}`,
-    nome: "Fachada (Google)",
-  });
+  const existentes = new Set<string>();
+  for (const d of docs) {
+    const mref = /[?&]ref=([^&]+)/.exec(d.url);
+    if (mref) existentes.add(decodeURIComponent(mref[1]));
+  }
+  let temFachada = docs.some(d => d.tipo === "foto_fachada");
+  for (const ref of refs) {
+    if (!ref || existentes.has(ref)) continue;
+    existentes.add(ref);
+    const tipo = temFachada ? "foto_interior" : "foto_fachada";
+    temFachada = true;
+    await db.addDocumento({
+      oficinaId,
+      tipo,
+      url: `/api/place-photo?ref=${encodeURIComponent(ref)}`,
+      nome: tipo === "foto_fachada" ? "Fachada (Google)" : "Foto (Google)",
+    });
+  }
 }
 
 // Re-enriquece uma oficina já existente SEM sobrescrever edições manuais:
@@ -298,7 +315,7 @@ async function reenrichOficina(of: Oficina): Promise<void> {
     if (isEmpty(of.longitude) && d.longitude) patch.longitude = d.longitude;
   }
   await db.updateOficina(of.id, patch);
-  if (d?.photoRef) await saveFachadaFoto(of.id, d.photoRef);
+  if (d?.photoRefs?.length) await saveFotos(of.id, d.photoRefs);
 }
 
 async function runReenrichPass(): Promise<void> {
@@ -398,14 +415,14 @@ async function processJobFully(
         duplicados += 1;
         continue;
       }
-      const { oficina, photoRef } = await buildOficina(
+      const { oficina, photoRefs } = await buildOficina(
         cand,
         job.cidade,
         job.estado,
         job.segmento
       );
       const id = await db.insertImportedOficina(oficina);
-      if (photoRef) await saveFachadaFoto(id, photoRef);
+      if (photoRefs?.length) await saveFotos(id, photoRefs);
       importados += 1;
     } catch (error) {
       console.error("[Import] Falha ao inserir oficina:", error);

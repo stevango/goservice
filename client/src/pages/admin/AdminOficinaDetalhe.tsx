@@ -6,10 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useParams } from "wouter";
 import { Link } from "wouter";
-import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock, Globe, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock, Globe, Image as ImageIcon, Instagram } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, segmentoLabel, traduzHorario } from "@shared/types";
+import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, segmentoLabel, traduzHorario, ehInstagram } from "@shared/types";
 import { OsmMap } from "@/components/OsmMap";
 import { Lightbox } from "@/components/Lightbox";
 
@@ -36,6 +36,8 @@ export default function AdminOficinaDetalhe() {
   const categoriaInfo = CATEGORIAS_OFICINA.find(c => c.value === data.categoria);
   const fornecePecasInfo = FORNECE_PECAS_OPTIONS.find(f => f.value === data.fornecePecas);
   const fotos = (data.documentos || []).filter(d => d.tipo.startsWith("foto"));
+  const instaUrl = ehInstagram(data.website) ? data.website : null;
+  const siteUrl = data.website && !ehInstagram(data.website) ? data.website : null;
 
   return (
     <AdminLayout>
@@ -94,9 +96,17 @@ export default function AdminOficinaDetalhe() {
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">E-mail</span>{data.email || "—"}</div>
               <div className="p-2 rounded bg-muted/50">
                 <span className="text-xs text-muted-foreground block">Website</span>
-                {data.website ? (
-                  <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 break-all">
-                    <Globe className="w-3.5 h-3.5 shrink-0" />{data.website}
+                {siteUrl ? (
+                  <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 break-all">
+                    <Globe className="w-3.5 h-3.5 shrink-0" />{siteUrl}
+                  </a>
+                ) : "—"}
+              </div>
+              <div className="p-2 rounded bg-muted/50">
+                <span className="text-xs text-muted-foreground block">Instagram</span>
+                {instaUrl ? (
+                  <a href={instaUrl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline inline-flex items-center gap-1 break-all">
+                    <Instagram className="w-3.5 h-3.5 shrink-0" />{instaUrl}
                   </a>
                 ) : "—"}
               </div>

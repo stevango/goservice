@@ -60,6 +60,12 @@ export function segmentoLabel(value: string | null | undefined): string {
   return (value && SEGMENTO_INFO[value]?.label) || value || "—";
 }
 
+// Google não tem campo de Instagram; mas muitos negócios cadastram o
+// Instagram como "site". Detecta isso para exibir como rede social.
+export function ehInstagram(url: string | null | undefined): boolean {
+  return !!url && /(^|\/\/|\.)instagram\.com/i.test(url);
+}
+
 // Traduz o horário do Google (weekday_text) para PT-BR na exibição.
 // Cobre dados já salvos em inglês sem precisar re-enriquecer.
 const DIAS_EN_PT: Record<string, string> = {
