@@ -1,6 +1,7 @@
 import * as db from "../db";
 import type { InsertOficina, Oficina } from "../../drizzle/schema";
 import { makeRequest, type PlaceDetailsResult } from "./map";
+import { segmentoLabel } from "@shared/types";
 
 // Resposta do Text Search (o tipo do map.ts não inclui o token de página).
 type TextSearchResponse = {
@@ -154,28 +155,35 @@ async function fetchDetails(placeId: string): Promise<ParsedDetails | null> {
   }
 }
 
-function defaultDescricao(cidade: string, estado: string): string {
-  return `Oficina em ${cidade}/${estado}. Cadastro importado do Google — dados ainda não verificados.`;
+function defaultDescricao(
+  segmento: string,
+  cidade: string,
+  estado: string
+): string {
+  return `${segmentoLabel(segmento)} em ${cidade}/${estado}. Cadastro importado do Google — dados ainda não verificados.`;
 }
 
 async function buildOficina(
   cand: Candidato,
   cidade: string,
-  estado: string
+  estado: string,
+  segmento: string
 ): Promise<{ oficina: InsertOficina; photoRef?: string }> {
-  const nome = clamp(cand.nome, 255) || "Oficina (sem nome)";
+  const nome = clamp(cand.nome, 255) || "Prestador (sem nome)";
   const oficina: InsertOficina = {
     cnpj: "",
     razaoSocial: nome,
     nomeFantasia: nome,
+    segmento,
     logradouro: clamp(cand.endereco, 500),
     cidade: clamp(cidade, 255),
     estado: clamp(estado, 2),
     latitude: coord(cand.lat),
     longitude: coord(cand.lng),
-    descricao: defaultDescricao(cidade, estado),
-    tiposServicos: ["mecanica"],
-    tiposVeiculos: ["leve"],
+    descricao: defaultDescricao(segmento, cidade, estado),
+    // Defaults de oficina só fazem sentido no segmento automotivo.
+    tiposServicos: segmento === "oficina_mecanica" ? ["mecanica"] : undefined,
+    tiposVeiculos: segmento === "oficina_mecanica" ? ["leve"] : undefined,
     status: "pendente",
     googlePlaceId: cand.placeId,
     enrichedAt: new Date(),
@@ -239,12 +247,19 @@ async function reenrichOficina(of: Oficina): Promise<void> {
     if (isEmpty(of.cep) && d.cep) patch.cep = d.cep;
     if (isEmpty(of.descricao))
       patch.descricao = defaultDescricao(
+        of.segmento,
         of.cidade ?? "",
         of.estado ?? ""
       );
-    if (!of.tiposServicos || of.tiposServicos.length === 0)
+    if (
+      of.segmento === "oficina_mecanica" &&
+      (!of.tiposServicos || of.tiposServicos.length === 0)
+    )
       patch.tiposServicos = ["mecanica"];
-    if (!of.tiposVeiculos || of.tiposVeiculos.length === 0)
+    if (
+      of.segmento === "oficina_mecanica" &&
+      (!of.tiposVeiculos || of.tiposVeiculos.length === 0)
+    )
       patch.tiposVeiculos = ["leve"];
     if (d.scoreReputacao) patch.scoreReputacao = d.scoreReputacao;
     if (typeof d.totalAvaliacoes === "number")
@@ -365,7 +380,8 @@ async function insertBatch(
       const { oficina, photoRef } = await buildOficina(
         cand,
         job.cidade,
-        job.estado
+        job.estado,
+        job.segmento
       );
       const id = await db.insertImportedOficina(oficina);
       if (photoRef) await saveFachadaFoto(id, photoRef);

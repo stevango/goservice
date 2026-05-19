@@ -1,4 +1,5 @@
 import { COOKIE_NAME } from "@shared/const";
+import { SEGMENTO_INFO } from "@shared/types";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
@@ -233,6 +234,7 @@ export const appRouter = router({
     listarAdmin: adminProcedure.input(z.object({
       status: z.string().optional(),
       categoria: z.string().optional(),
+      segmento: z.string().optional(),
       cidade: z.string().optional(),
       estado: z.string().optional(),
       search: z.string().optional(),
@@ -452,7 +454,7 @@ export const appRouter = router({
     iniciar: adminProcedure
       .input(
         z.object({
-          termo: z.string().trim().min(2).max(120),
+          segmento: z.string().refine(s => !!SEGMENTO_INFO[s], "Segmento inválido"),
           cidade: z.string().trim().min(2).max(120),
           estado: z.string().trim().length(2),
           limite: z.number().int().min(1).max(300),
@@ -460,7 +462,8 @@ export const appRouter = router({
       )
       .mutation(async ({ input }) => {
         const id = await db.createImportJob({
-          termo: input.termo,
+          termo: SEGMENTO_INFO[input.segmento].termo,
+          segmento: input.segmento,
           cidade: input.cidade,
           estado: input.estado.toUpperCase(),
           limite: input.limite,

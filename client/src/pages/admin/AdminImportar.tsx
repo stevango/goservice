@@ -6,12 +6,19 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
-import { ESTADOS_BRASIL, ESTADOS_BRASIL_NOMES } from "@shared/types";
+import {
+  ESTADOS_BRASIL,
+  ESTADOS_BRASIL_NOMES,
+  SEGMENTOS,
+  segmentoLabel,
+} from "@shared/types";
 import { Download, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -26,7 +33,7 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default function AdminImportar() {
   const [form, setForm] = useState({
-    termo: "oficina mecânica",
+    segmento: "oficina_mecanica",
     estado: "",
     cidade: "",
     limite: 60,
@@ -104,7 +111,7 @@ export default function AdminImportar() {
   }, [form.estado]);
 
   const podeIniciar =
-    form.termo.trim().length >= 2 &&
+    form.segmento.length > 0 &&
     form.estado.length === 2 &&
     form.cidade.trim().length >= 2 &&
     form.limite >= 1 &&
@@ -115,11 +122,11 @@ export default function AdminImportar() {
     <AdminLayout>
       <div className="mb-6">
         <h1 className="text-2xl font-bold tracking-tight">
-          Importar Oficinas (Google)
+          Importar Prestadores (GO SERVICE)
         </h1>
         <p className="text-muted-foreground">
-          Busca oficinas no Google e cadastra como{" "}
-          <strong>pendentes / não verificadas</strong>. Roda devagar, em
+          Busca prestadores no Google por <strong>segmento</strong> e cadastra
+          como <strong>pendentes / não verificados</strong>. Roda devagar, em
           segundo plano, sem travar o site.
         </p>
       </div>
@@ -134,14 +141,27 @@ export default function AdminImportar() {
             }}
           >
             <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="termo">O que buscar</Label>
-              <Input
-                id="termo"
-                required
-                value={form.termo}
-                onChange={e => setForm({ ...form, termo: e.target.value })}
-                placeholder="oficina mecânica"
-              />
+              <Label htmlFor="segmento">Segmento</Label>
+              <Select
+                value={form.segmento}
+                onValueChange={s => setForm({ ...form, segmento: s })}
+              >
+                <SelectTrigger id="segmento" className="w-full">
+                  <SelectValue placeholder="Selecione o segmento" />
+                </SelectTrigger>
+                <SelectContent>
+                  {SEGMENTOS.map(g => (
+                    <SelectGroup key={g.grupo}>
+                      <SelectLabel>{g.grupo}</SelectLabel>
+                      {g.itens.map(i => (
+                        <SelectItem key={i.value} value={i.value}>
+                          {i.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -289,7 +309,7 @@ export default function AdminImportar() {
               <CardContent className="py-4 flex flex-wrap items-center gap-4">
                 <div className="flex-1 min-w-[180px]">
                   <p className="font-medium">
-                    {job.termo} — {job.cidade}/{job.estado}
+                    {segmentoLabel(job.segmento)} — {job.cidade}/{job.estado}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     Página {job.pagina} · {job.importados}/{job.limite}{" "}

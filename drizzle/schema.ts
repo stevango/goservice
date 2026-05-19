@@ -59,6 +59,7 @@ export const oficinas = mysqlTable("oficinas", {
   pixChave: varchar("pixChave", { length: 255 }),
   
   // Classificação
+  segmento: varchar("segmento", { length: 64 }).default("oficina_mecanica").notNull(),
   categoria: mysqlEnum("categoria", ["premium", "concessionaria", "padrao"]).default("padrao").notNull(),
   
   // Tipos de veículos (JSON array)
@@ -214,6 +215,7 @@ export type InsertNotificacao = typeof notificacoes.$inferInsert;
 export const importJobs = mysqlTable("import_jobs", {
   id: int("id").autoincrement().primaryKey(),
   termo: varchar("termo", { length: 255 }).notNull(),
+  segmento: varchar("segmento", { length: 64 }).default("oficina_mecanica").notNull(),
   cidade: varchar("cidade", { length: 255 }).notNull(),
   estado: varchar("estado", { length: 2 }).notNull(),
   status: mysqlEnum("statusImport", [

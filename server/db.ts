@@ -135,6 +135,7 @@ export async function getOficinaByUserId(userId: number) {
 export async function listOficinas(filters?: {
   status?: string;
   categoria?: string;
+  segmento?: string;
   cidade?: string;
   estado?: string;
   tipoVeiculo?: string;
@@ -147,9 +148,10 @@ export async function listOficinas(filters?: {
   if (!db) return { oficinas: [], total: 0 };
 
   const conditions: any[] = [];
-  
+
   if (filters?.status) conditions.push(eq(oficinas.status, filters.status as any));
   if (filters?.categoria) conditions.push(eq(oficinas.categoria, filters.categoria as any));
+  if (filters?.segmento) conditions.push(eq(oficinas.segmento, filters.segmento));
   if (filters?.cidade) conditions.push(like(oficinas.cidade, `%${filters.cidade}%`));
   if (filters?.estado) conditions.push(eq(oficinas.estado, filters.estado));
   if (filters?.search) {
@@ -184,6 +186,7 @@ export async function listOficinas(filters?: {
 
 export async function listOficinasPublic(filters?: {
   categoria?: string;
+  segmento?: string;
   cidade?: string;
   estado?: string;
   tipoVeiculo?: string;
@@ -430,6 +433,7 @@ export async function resetEnrichmentForImported(): Promise<number> {
 
 export async function createImportJob(data: {
   termo: string;
+  segmento: string;
   cidade: string;
   estado: string;
   limite: number;

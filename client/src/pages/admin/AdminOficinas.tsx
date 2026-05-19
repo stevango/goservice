@@ -1,7 +1,7 @@
 import AdminLayout from "@/components/AdminLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { trpc } from "@/lib/trpc";
@@ -9,17 +9,19 @@ import { Link } from "wouter";
 import { Search, Eye, CheckCircle2, XCircle, Clock, Ban } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { ESTADOS_BRASIL } from "@shared/types";
+import { ESTADOS_BRASIL, SEGMENTOS, segmentoLabel } from "@shared/types";
 
 export default function AdminOficinas() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [estado, setEstado] = useState("");
+  const [segmento, setSegmento] = useState("");
 
   const { data, isLoading, refetch } = trpc.oficinas.listarAdmin.useQuery({
     search: search || undefined,
     status: status || undefined,
     estado: estado || undefined,
+    segmento: segmento || undefined,
     limit: 100,
   });
 
@@ -69,8 +71,21 @@ export default function AdminOficinas() {
             {ESTADOS_BRASIL.map(e => <SelectItem key={e} value={e}>{e}</SelectItem>)}
           </SelectContent>
         </Select>
-        {(status || estado) && (
-          <Button variant="ghost" size="sm" onClick={() => { setStatus(""); setEstado(""); }}>Limpar</Button>
+        <Select value={segmento} onValueChange={setSegmento}>
+          <SelectTrigger className="w-56"><SelectValue placeholder="Segmento" /></SelectTrigger>
+          <SelectContent>
+            {SEGMENTOS.map(g => (
+              <SelectGroup key={g.grupo}>
+                <SelectLabel>{g.grupo}</SelectLabel>
+                {g.itens.map(i => (
+                  <SelectItem key={i.value} value={i.value}>{i.label}</SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
+        {(status || estado || segmento) && (
+          <Button variant="ghost" size="sm" onClick={() => { setStatus(""); setEstado(""); setSegmento(""); }}>Limpar</Button>
         )}
       </div>
 
@@ -79,7 +94,8 @@ export default function AdminOficinas() {
         <Table>
           <TableHeader>
             <TableRow className="bg-muted/30">
-              <TableHead>Oficina</TableHead>
+              <TableHead>Prestador</TableHead>
+              <TableHead>Segmento</TableHead>
               <TableHead>Cidade/UF</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Status</TableHead>
@@ -90,9 +106,9 @@ export default function AdminOficinas() {
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : data?.oficinas.length === 0 ? (
-              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma oficina encontrada</TableCell></TableRow>
+              <TableRow><TableCell colSpan={8} className="text-center py-8 text-muted-foreground">Nenhum prestador encontrado</TableCell></TableRow>
             ) : (
               data?.oficinas.map(oficina => (
                 <TableRow key={oficina.id} className="hover:bg-muted/20">
@@ -102,6 +118,7 @@ export default function AdminOficinas() {
                       <p className="text-xs text-muted-foreground">{oficina.cnpj}</p>
                     </div>
                   </TableCell>
+                  <TableCell className="text-xs">{segmentoLabel(oficina.segmento)}</TableCell>
                   <TableCell className="text-sm">{oficina.cidade}/{oficina.estado}</TableCell>
                   <TableCell>
                     <span className="text-xs capitalize font-medium">{oficina.categoria}</span>

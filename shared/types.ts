@@ -1,3 +1,65 @@
+// Catálogo de segmentos da rede GO SERVICE. Cada segmento tem o termo
+// de busca usado no Google Places. Agrupado para a UI.
+export const SEGMENTOS = [
+  {
+    grupo: "Automotivo",
+    itens: [
+      { value: "oficina_mecanica", label: "Oficina Mecânica", termo: "oficina mecânica" },
+      { value: "loja_pecas", label: "Loja de Peças Automotivas", termo: "loja de peças automotivas" },
+      { value: "fornecedor_pecas", label: "Fornecedor de Peças Automotivas", termo: "distribuidora de autopeças" },
+      { value: "lava_jato", label: "Lava-Jato", termo: "lava jato" },
+      { value: "posto_gasolina", label: "Posto de Gasolina", termo: "posto de gasolina" },
+      { value: "som_acessorios", label: "Som e Acessórios Automotivos", termo: "som e acessórios automotivos" },
+      { value: "troca_pneu", label: "Troca de Pneu / Borracharia", termo: "borracharia" },
+      { value: "recarga_bateria", label: "Recarga de Bateria", termo: "recarga de bateria automotiva" },
+    ],
+  },
+  {
+    grupo: "Assistência Veicular 24h",
+    itens: [
+      { value: "assistencia_24h", label: "Assistência Veicular 24h", termo: "assistência veicular 24 horas" },
+      { value: "reboque_guincho", label: "Reboque / Guincho", termo: "guincho reboque" },
+      { value: "chaveiro_auto", label: "Chaveiro Automotivo", termo: "chaveiro automotivo" },
+    ],
+  },
+  {
+    grupo: "Apoio ao Motorista",
+    itens: [
+      { value: "taxi_app", label: "Táxi / Aplicativo", termo: "ponto de táxi" },
+      { value: "hospedagem", label: "Hospedagem", termo: "hotel" },
+      { value: "carro_reserva", label: "Carro Reserva", termo: "locadora de veículos" },
+      { value: "guarda_veiculo", label: "Guarda do Veículo", termo: "estacionamento" },
+      { value: "motorista_substituto", label: "Motorista Substituto", termo: "motorista particular" },
+    ],
+  },
+  {
+    grupo: "Assistência Residencial",
+    itens: [
+      { value: "chaveiro_residencial", label: "Chaveiro Residencial", termo: "chaveiro" },
+      { value: "eletricista", label: "Eletricista", termo: "eletricista" },
+      { value: "encanador", label: "Encanador", termo: "encanador" },
+      { value: "vidraceiro", label: "Vidraceiro", termo: "vidraçaria" },
+      { value: "desentupimento", label: "Desentupimento", termo: "desentupidora" },
+      { value: "reparos_emergenciais", label: "Reparos Emergenciais", termo: "serviços de reparos residenciais" },
+      { value: "cobertura_telhado", label: "Cobertura Provisória de Telhado", termo: "reforma de telhado" },
+      { value: "vigilancia_residencial", label: "Vigilância Residencial", termo: "empresa de segurança" },
+      { value: "limpeza_emergencial", label: "Limpeza Emergencial", termo: "serviço de limpeza" },
+    ],
+  },
+] as const;
+
+export type SegmentoInfo = { label: string; termo: string; grupo: string };
+
+export const SEGMENTO_INFO: Record<string, SegmentoInfo> = Object.fromEntries(
+  SEGMENTOS.flatMap(g =>
+    g.itens.map(i => [i.value, { label: i.label, termo: i.termo, grupo: g.grupo }])
+  )
+);
+
+export function segmentoLabel(value: string | null | undefined): string {
+  return (value && SEGMENTO_INFO[value]?.label) || value || "—";
+}
+
 export const TIPOS_VEICULOS = [
   { value: "leve", label: "Veículo Leve" },
   { value: "pesado", label: "Veículo Pesado" },
