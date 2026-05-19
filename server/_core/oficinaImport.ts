@@ -289,6 +289,21 @@ async function runReenrichPass(): Promise<void> {
 async function collectPage(
   job: Awaited<ReturnType<typeof db.pickNextImportJob>> & object
 ): Promise<void> {
+  // Encerra a coleta: ranqueia (melhor avaliação primeiro), corta no
+  // limite e passa para a fase de inserção.
+  async function finalize(acc: Candidato[]): Promise<void> {
+    acc.sort((a, b) => b.rating - a.rating || b.urt - a.urt);
+    await db.updateImportJob(job.id, {
+      status: "rodando",
+      fase: "inserindo",
+      candidatos: acc.slice(0, job.limite),
+      nextPageToken: null,
+      pagina: job.pagina + 1,
+      encontrados: acc.length,
+      erro: null,
+    });
+  }
+
   const params: Record<string, unknown> = job.nextPageToken
     ? { pagetoken: job.nextPageToken }
     : { query: `${job.termo} em ${job.cidade}, ${job.estado}, Brasil` };
@@ -307,7 +322,14 @@ async function collectPage(
     return;
   }
 
-  if (resp.status === "INVALID_REQUEST" && job.nextPageToken) return; // token ainda não ativo
+  // Token de paginação recusado: a 1 ciclo/min ele já deveria estar
+  // ativo, então isso significa token expirado/desabilitado (comum em
+  // projetos novos do Google). Em vez de repetir pra sempre, finaliza
+  // com o que já coletamos — garante progresso e nada de travar.
+  if (resp.status === "INVALID_REQUEST" && job.nextPageToken) {
+    await finalize([...(job.candidatos ?? [])]);
+    return;
+  }
 
   if (resp.status !== "OK" && resp.status !== "ZERO_RESULTS") {
     await db.updateImportJob(job.id, {
@@ -346,17 +368,7 @@ async function collectPage(
     return;
   }
 
-  // Sem mais páginas: ranqueia (melhor avaliação primeiro) e corta no limite.
-  acc.sort((a, b) => b.rating - a.rating || b.urt - a.urt);
-  await db.updateImportJob(job.id, {
-    status: "rodando",
-    fase: "inserindo",
-    candidatos: acc.slice(0, job.limite),
-    nextPageToken: null,
-    pagina: job.pagina + 1,
-    encontrados: acc.length,
-    erro: null,
-  });
+  await finalize(acc);
 }
 
 // Fase 2: insere os melhores aos poucos.
