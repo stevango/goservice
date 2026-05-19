@@ -29,39 +29,47 @@ function coord(n: number | undefined): string | undefined {
   return n.toFixed(7);
 }
 
+type AddressComponent = { long_name: string; short_name: string; types: string[] };
+
+// Pega o primeiro componente de endereço cujo "types" contenha um dos tipos.
+function pickComponent(
+  components: AddressComponent[] | undefined,
+  types: string[],
+  useShort = false
+): string | undefined {
+  if (!components) return undefined;
+  for (const t of types) {
+    const hit = components.find(c => c.types.includes(t));
+    if (hit) return useShort ? hit.short_name : hit.long_name;
+  }
+  return undefined;
+}
+
+const DETAILS_FIELDS = [
+  "name",
+  "formatted_address",
+  "address_component",
+  "formatted_phone_number",
+  "international_phone_number",
+  "website",
+  "rating",
+  "user_ratings_total",
+  "opening_hours",
+  "business_status",
+  "geometry",
+].join(",");
+
 async function buildOficina(
   place: TextSearchResponse["results"][number],
   cidade: string,
   estado: string
 ): Promise<InsertOficina> {
-  let telefone: string | undefined;
-  let website: string | undefined;
-  let endereco = place.formatted_address;
-
-  try {
-    const details = await makeRequest<PlaceDetailsResult>(
-      "/maps/api/place/details/json",
-      {
-        place_id: place.place_id,
-        fields: "formatted_phone_number,website,formatted_address",
-      }
-    );
-    telefone = clamp(details.result?.formatted_phone_number, 20);
-    website = clamp(details.result?.website, 500);
-    endereco = details.result?.formatted_address ?? endereco;
-  } catch (error) {
-    console.warn("[Import] Place Details falhou (segue sem telefone):", error);
-  }
-
   const nome = clamp(place.name, 255) || "Oficina (sem nome)";
-
-  return {
+  const oficina: InsertOficina = {
     cnpj: "",
     razaoSocial: nome,
     nomeFantasia: nome,
-    telefone,
-    website,
-    logradouro: clamp(endereco, 500),
+    logradouro: clamp(place.formatted_address, 500),
     cidade: clamp(cidade, 255),
     estado: clamp(estado, 2),
     latitude: coord(place.geometry?.location?.lat),
@@ -70,6 +78,67 @@ async function buildOficina(
     googlePlaceId: place.place_id,
     observacoesAdmin: `Importado via Google Places em ${new Date().toISOString()} (NÃO VERIFICADO).`,
   };
+
+  try {
+    const { result } = await makeRequest<PlaceDetailsResult>(
+      "/maps/api/place/details/json",
+      { place_id: place.place_id, fields: DETAILS_FIELDS }
+    );
+    if (result) {
+      const comps = result.address_components;
+      const numero = pickComponent(comps, ["street_number"]);
+      const rua = pickComponent(comps, ["route"]);
+      const bairro = pickComponent(comps, [
+        "sublocality_level_1",
+        "sublocality",
+        "neighborhood",
+      ]);
+      const cidadeComp = pickComponent(comps, [
+        "administrative_area_level_2",
+        "locality",
+      ]);
+      const ufComp = pickComponent(
+        comps,
+        ["administrative_area_level_1"],
+        true
+      );
+      const cep = pickComponent(comps, ["postal_code"]);
+
+      oficina.telefone = clamp(
+        result.formatted_phone_number ?? result.international_phone_number,
+        20
+      );
+      oficina.website = clamp(result.website, 500);
+      oficina.logradouro = clamp(rua ?? result.formatted_address, 500);
+      oficina.numero = clamp(numero, 20);
+      oficina.bairro = clamp(bairro, 255);
+      if (cidadeComp) oficina.cidade = clamp(cidadeComp, 255);
+      if (ufComp && ufComp.length === 2) oficina.estado = ufComp;
+      oficina.cep = clamp(cep, 9);
+      if (typeof result.rating === "number") {
+        oficina.scoreReputacao = result.rating.toFixed(1);
+      }
+      if (typeof result.user_ratings_total === "number") {
+        oficina.totalAvaliacoes = result.user_ratings_total;
+      }
+      if (result.opening_hours?.weekday_text?.length) {
+        oficina.horarioFuncionamento =
+          result.opening_hours.weekday_text.join("\n");
+      }
+      const loc = result.geometry?.location;
+      if (loc) {
+        oficina.latitude = coord(loc.lat) ?? oficina.latitude;
+        oficina.longitude = coord(loc.lng) ?? oficina.longitude;
+      }
+    }
+  } catch (error) {
+    console.warn(
+      "[Import] Place Details falhou (segue com dados básicos):",
+      error
+    );
+  }
+
+  return oficina;
 }
 
 // Processa UMA página de UM job por vez. Chamado periodicamente.

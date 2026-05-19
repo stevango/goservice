@@ -185,9 +185,16 @@ export type PlaceDetailsResult = {
     place_id: string;
     name: string;
     formatted_address: string;
+    address_components?: Array<{
+      long_name: string;
+      short_name: string;
+      types: string[];
+    }>;
     formatted_phone_number?: string;
     international_phone_number?: string;
     website?: string;
+    url?: string;
+    business_status?: string;
     rating?: number;
     user_ratings_total?: number;
     reviews?: Array<{
