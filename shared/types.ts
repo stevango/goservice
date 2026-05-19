@@ -61,6 +61,16 @@ export const SEGMENTOS = [
       { value: "transporte_pet", label: "Transporte / Táxi Pet", termo: "transporte de animais" },
     ],
   },
+  {
+    grupo: "Energia Solar",
+    itens: [
+      { value: "energia_solar_empresa", label: "Empresa de Energia Solar", termo: "empresa de energia solar" },
+      { value: "loja_placa_solar", label: "Loja de Placas Solares", termo: "loja de energia solar" },
+      { value: "revendedor_placa_solar", label: "Revendedor / Distribuidor Solar", termo: "distribuidora de energia solar" },
+      { value: "instalador_placa_solar", label: "Instalador de Energia Solar", termo: "instalador de energia solar" },
+      { value: "manutencao_placa_solar", label: "Manutenção / Limpeza de Painéis", termo: "manutenção de placas solares" },
+    ],
+  },
 ] as const;
 
 export type SegmentoInfo = { label: string; termo: string; grupo: string };
