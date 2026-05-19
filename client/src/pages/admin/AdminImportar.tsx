@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/select";
 import { trpc } from "@/lib/trpc";
 import { ESTADOS_BRASIL, ESTADOS_BRASIL_NOMES } from "@shared/types";
-import { Download, Loader2, X } from "lucide-react";
+import { Download, Loader2, RefreshCw, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
@@ -54,6 +54,21 @@ export default function AdminImportar() {
     onSuccess: () => {
       toast.success("Importação cancelada.");
       jobs.refetch();
+    },
+    onError: e => toast.error(e.message),
+  });
+
+  const pendentes = trpc.importacao.pendentesEnriquecimento.useQuery(
+    undefined,
+    { refetchInterval: 15_000 }
+  );
+
+  const reenriquecer = trpc.importacao.reenriquecer.useMutation({
+    onSuccess: ({ total }) => {
+      toast.success(
+        `${total} oficina(s) na fila de re-enriquecimento. Roda devagar em segundo plano.`
+      );
+      pendentes.refetch();
     },
     onError: e => toast.error(e.message),
   });
@@ -226,6 +241,33 @@ export default function AdminImportar() {
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card className="mb-8">
+        <CardContent className="py-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="font-medium">Re-enriquecer oficinas importadas</p>
+            <p className="text-xs text-muted-foreground">
+              Reprocessa as já importadas (endereço, CEP, reputação, horário,
+              foto) sem duplicar nem apagar edições manuais.
+              {typeof pendentes.data?.total === "number" && (
+                <> {pendentes.data.total} na fila.</>
+              )}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            disabled={reenriquecer.isPending}
+            onClick={() => reenriquecer.mutate()}
+          >
+            {reenriquecer.isPending ? (
+              <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            ) : (
+              <RefreshCw className="w-4 h-4 mr-2" />
+            )}
+            Re-enriquecer todas
+          </Button>
         </CardContent>
       </Card>
 

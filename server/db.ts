@@ -1,4 +1,4 @@
-import { eq, and, like, or, sql, desc, asc, count, inArray } from "drizzle-orm";
+import { eq, and, like, or, sql, desc, asc, count, inArray, isNull, isNotNull } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao, importJobs, ImportJob, InsertImportJob } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -386,11 +386,46 @@ export async function oficinaExistsByGooglePlaceId(placeId: string): Promise<boo
   return result.length > 0;
 }
 
-export async function insertImportedOficina(data: InsertOficina): Promise<void> {
+export async function insertImportedOficina(data: InsertOficina): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.insert(oficinas).values(data);
+  const result = await db.insert(oficinas).values(data);
   invalidatePrefix(OFICINAS_CACHE_PREFIX);
+  return result[0].insertId;
+}
+
+// Oficinas importadas do Google que ainda precisam de enriquecimento.
+export async function pickOficinasToEnrich(limit: number): Promise<Oficina[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(oficinas)
+    .where(and(isNotNull(oficinas.googlePlaceId), isNull(oficinas.enrichedAt)))
+    .orderBy(asc(oficinas.id))
+    .limit(limit);
+}
+
+export async function countOficinasToEnrich(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .select({ count: count() })
+    .from(oficinas)
+    .where(and(isNotNull(oficinas.googlePlaceId), isNull(oficinas.enrichedAt)));
+  return Number(result[0]?.count || 0);
+}
+
+// Marca todas as importadas para re-enriquecer (worker reprocessa devagar).
+export async function resetEnrichmentForImported(): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db
+    .update(oficinas)
+    .set({ enrichedAt: null })
+    .where(isNotNull(oficinas.googlePlaceId));
+  invalidatePrefix(OFICINAS_CACHE_PREFIX);
+  return Number((result[0] as { affectedRows?: number })?.affectedRows || 0);
 }
 
 export async function createImportJob(data: {

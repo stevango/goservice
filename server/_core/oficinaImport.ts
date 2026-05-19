@@ -1,5 +1,5 @@
 import * as db from "../db";
-import type { InsertOficina } from "../../drizzle/schema";
+import type { InsertOficina, Oficina } from "../../drizzle/schema";
 import { makeRequest, type PlaceDetailsResult } from "./map";
 
 // Resposta do Text Search (o tipo do map.ts não inclui o token de página).
@@ -8,6 +8,8 @@ type TextSearchResponse = {
     place_id: string;
     name: string;
     formatted_address?: string;
+    rating?: number;
+    user_ratings_total?: number;
     geometry?: { location?: { lat: number; lng: number } };
   }>;
   status: string;
@@ -15,7 +17,19 @@ type TextSearchResponse = {
   error_message?: string;
 };
 
-const TICK_MS = 60_000; // devagarinho: 1 página de no máx. 20 por minuto
+type Candidato = {
+  placeId: string;
+  nome: string;
+  rating: number;
+  urt: number;
+  lat?: number;
+  lng?: number;
+  endereco?: string;
+};
+
+const TICK_MS = 60_000;
+const INSERT_PER_TICK = 8; // insere os melhores aos poucos, sem travar
+const ENRICH_PER_TICK = 5; // re-enriquece antigas quando não há import ativo
 let workerStarted = false;
 let isRunning = false;
 
@@ -29,9 +43,12 @@ function coord(n: number | undefined): string | undefined {
   return n.toFixed(7);
 }
 
+function isEmpty(v: unknown): boolean {
+  return v === null || v === undefined || v === "";
+}
+
 type AddressComponent = { long_name: string; short_name: string; types: string[] };
 
-// Pega o primeiro componente de endereço cujo "types" contenha um dos tipos.
 function pickComponent(
   components: AddressComponent[] | undefined,
   types: string[],
@@ -57,173 +74,344 @@ const DETAILS_FIELDS = [
   "opening_hours",
   "business_status",
   "geometry",
+  "photo",
 ].join(",");
 
+type ParsedDetails = {
+  telefone?: string;
+  website?: string;
+  logradouro?: string;
+  numero?: string;
+  bairro?: string;
+  cidade?: string;
+  estado?: string;
+  cep?: string;
+  scoreReputacao?: string;
+  totalAvaliacoes?: number;
+  horarioFuncionamento?: string;
+  latitude?: string;
+  longitude?: string;
+  photoRef?: string;
+};
+
+// Busca o Place Details e normaliza os campos que nos interessam. É a
+// MESMA fonte que o Manus usava (Google Places) — só lemos mais campos.
+async function fetchDetails(placeId: string): Promise<ParsedDetails | null> {
+  try {
+    const { result } = await makeRequest<PlaceDetailsResult>(
+      "/maps/api/place/details/json",
+      { place_id: placeId, fields: DETAILS_FIELDS }
+    );
+    if (!result) return null;
+
+    const comps = result.address_components;
+    const ufComp = pickComponent(comps, ["administrative_area_level_1"], true);
+    const parsed: ParsedDetails = {
+      telefone: clamp(
+        result.formatted_phone_number ?? result.international_phone_number,
+        20
+      ),
+      website: clamp(result.website, 500),
+      logradouro: clamp(
+        pickComponent(comps, ["route"]) ?? result.formatted_address,
+        500
+      ),
+      numero: clamp(pickComponent(comps, ["street_number"]), 20),
+      bairro: clamp(
+        pickComponent(comps, [
+          "sublocality_level_1",
+          "sublocality",
+          "neighborhood",
+        ]),
+        255
+      ),
+      cidade: clamp(
+        pickComponent(comps, ["administrative_area_level_2", "locality"]),
+        255
+      ),
+      estado: ufComp && ufComp.length === 2 ? ufComp : undefined,
+      cep: clamp(pickComponent(comps, ["postal_code"]), 9),
+      photoRef: result.photos?.[0]?.photo_reference,
+    };
+    if (typeof result.rating === "number") {
+      parsed.scoreReputacao = result.rating.toFixed(1);
+    }
+    if (typeof result.user_ratings_total === "number") {
+      parsed.totalAvaliacoes = result.user_ratings_total;
+    }
+    if (result.opening_hours?.weekday_text?.length) {
+      parsed.horarioFuncionamento = result.opening_hours.weekday_text.join("\n");
+    }
+    const loc = result.geometry?.location;
+    if (loc) {
+      parsed.latitude = coord(loc.lat);
+      parsed.longitude = coord(loc.lng);
+    }
+    return parsed;
+  } catch (error) {
+    console.warn("[Import] Place Details falhou:", error);
+    return null;
+  }
+}
+
+function defaultDescricao(cidade: string, estado: string): string {
+  return `Oficina em ${cidade}/${estado}. Cadastro importado do Google — dados ainda não verificados.`;
+}
+
 async function buildOficina(
-  place: TextSearchResponse["results"][number],
+  cand: Candidato,
   cidade: string,
   estado: string
-): Promise<InsertOficina> {
-  const nome = clamp(place.name, 255) || "Oficina (sem nome)";
+): Promise<{ oficina: InsertOficina; photoRef?: string }> {
+  const nome = clamp(cand.nome, 255) || "Oficina (sem nome)";
   const oficina: InsertOficina = {
     cnpj: "",
     razaoSocial: nome,
     nomeFantasia: nome,
-    logradouro: clamp(place.formatted_address, 500),
+    logradouro: clamp(cand.endereco, 500),
     cidade: clamp(cidade, 255),
     estado: clamp(estado, 2),
-    latitude: coord(place.geometry?.location?.lat),
-    longitude: coord(place.geometry?.location?.lng),
+    latitude: coord(cand.lat),
+    longitude: coord(cand.lng),
+    descricao: defaultDescricao(cidade, estado),
+    tiposServicos: ["mecanica"],
+    tiposVeiculos: ["leve"],
     status: "pendente",
-    googlePlaceId: place.place_id,
+    googlePlaceId: cand.placeId,
+    enrichedAt: new Date(),
     observacoesAdmin: `Importado via Google Places em ${new Date().toISOString()} (NÃO VERIFICADO).`,
   };
 
-  try {
-    const { result } = await makeRequest<PlaceDetailsResult>(
-      "/maps/api/place/details/json",
-      { place_id: place.place_id, fields: DETAILS_FIELDS }
-    );
-    if (result) {
-      const comps = result.address_components;
-      const numero = pickComponent(comps, ["street_number"]);
-      const rua = pickComponent(comps, ["route"]);
-      const bairro = pickComponent(comps, [
-        "sublocality_level_1",
-        "sublocality",
-        "neighborhood",
-      ]);
-      const cidadeComp = pickComponent(comps, [
-        "administrative_area_level_2",
-        "locality",
-      ]);
-      const ufComp = pickComponent(
-        comps,
-        ["administrative_area_level_1"],
-        true
-      );
-      const cep = pickComponent(comps, ["postal_code"]);
-
-      oficina.telefone = clamp(
-        result.formatted_phone_number ?? result.international_phone_number,
-        20
-      );
-      oficina.website = clamp(result.website, 500);
-      oficina.logradouro = clamp(rua ?? result.formatted_address, 500);
-      oficina.numero = clamp(numero, 20);
-      oficina.bairro = clamp(bairro, 255);
-      if (cidadeComp) oficina.cidade = clamp(cidadeComp, 255);
-      if (ufComp && ufComp.length === 2) oficina.estado = ufComp;
-      oficina.cep = clamp(cep, 9);
-      if (typeof result.rating === "number") {
-        oficina.scoreReputacao = result.rating.toFixed(1);
-      }
-      if (typeof result.user_ratings_total === "number") {
-        oficina.totalAvaliacoes = result.user_ratings_total;
-      }
-      if (result.opening_hours?.weekday_text?.length) {
-        oficina.horarioFuncionamento =
-          result.opening_hours.weekday_text.join("\n");
-      }
-      const loc = result.geometry?.location;
-      if (loc) {
-        oficina.latitude = coord(loc.lat) ?? oficina.latitude;
-        oficina.longitude = coord(loc.lng) ?? oficina.longitude;
-      }
-    }
-  } catch (error) {
-    console.warn(
-      "[Import] Place Details falhou (segue com dados básicos):",
-      error
-    );
+  const d = await fetchDetails(cand.placeId);
+  if (d) {
+    if (d.telefone) oficina.telefone = d.telefone;
+    if (d.website) oficina.website = d.website;
+    if (d.logradouro) oficina.logradouro = d.logradouro;
+    if (d.numero) oficina.numero = d.numero;
+    if (d.bairro) oficina.bairro = d.bairro;
+    if (d.cidade) oficina.cidade = d.cidade;
+    if (d.estado) oficina.estado = d.estado;
+    if (d.cep) oficina.cep = d.cep;
+    if (d.scoreReputacao) oficina.scoreReputacao = d.scoreReputacao;
+    if (typeof d.totalAvaliacoes === "number")
+      oficina.totalAvaliacoes = d.totalAvaliacoes;
+    if (d.horarioFuncionamento)
+      oficina.horarioFuncionamento = d.horarioFuncionamento;
+    if (d.latitude) oficina.latitude = d.latitude;
+    if (d.longitude) oficina.longitude = d.longitude;
   }
-
-  return oficina;
+  return { oficina, photoRef: d?.photoRef };
 }
 
-// Processa UMA página de UM job por vez. Chamado periodicamente.
+async function saveFachadaFoto(
+  oficinaId: number,
+  photoRef: string
+): Promise<void> {
+  const docs = await db.listDocumentos(oficinaId);
+  if (docs.some(doc => doc.tipo === "foto_fachada")) return;
+  await db.addDocumento({
+    oficinaId,
+    tipo: "foto_fachada",
+    url: `/api/place-photo?ref=${encodeURIComponent(photoRef)}`,
+    nome: "Fachada (Google)",
+  });
+}
+
+// Re-enriquece uma oficina já existente SEM sobrescrever edições manuais:
+// só preenche campos vazios. Reputação/horário (donos = Google) sempre
+// atualizam. Marca enrichedAt para não reprocessar.
+async function reenrichOficina(of: Oficina): Promise<void> {
+  if (!of.googlePlaceId) {
+    await db.updateOficina(of.id, { enrichedAt: new Date() });
+    return;
+  }
+  const d = await fetchDetails(of.googlePlaceId);
+  const patch: Partial<InsertOficina> = { enrichedAt: new Date() };
+  if (d) {
+    if (isEmpty(of.telefone) && d.telefone) patch.telefone = d.telefone;
+    if (isEmpty(of.website) && d.website) patch.website = d.website;
+    if (isEmpty(of.logradouro) && d.logradouro)
+      patch.logradouro = d.logradouro;
+    if (isEmpty(of.numero) && d.numero) patch.numero = d.numero;
+    if (isEmpty(of.bairro) && d.bairro) patch.bairro = d.bairro;
+    if (isEmpty(of.cidade) && d.cidade) patch.cidade = d.cidade;
+    if (isEmpty(of.estado) && d.estado) patch.estado = d.estado;
+    if (isEmpty(of.cep) && d.cep) patch.cep = d.cep;
+    if (isEmpty(of.descricao))
+      patch.descricao = defaultDescricao(
+        of.cidade ?? "",
+        of.estado ?? ""
+      );
+    if (!of.tiposServicos || of.tiposServicos.length === 0)
+      patch.tiposServicos = ["mecanica"];
+    if (!of.tiposVeiculos || of.tiposVeiculos.length === 0)
+      patch.tiposVeiculos = ["leve"];
+    if (d.scoreReputacao) patch.scoreReputacao = d.scoreReputacao;
+    if (typeof d.totalAvaliacoes === "number")
+      patch.totalAvaliacoes = d.totalAvaliacoes;
+    if (d.horarioFuncionamento)
+      patch.horarioFuncionamento = d.horarioFuncionamento;
+    if (isEmpty(of.latitude) && d.latitude) patch.latitude = d.latitude;
+    if (isEmpty(of.longitude) && d.longitude) patch.longitude = d.longitude;
+  }
+  await db.updateOficina(of.id, patch);
+  if (d?.photoRef) await saveFachadaFoto(of.id, d.photoRef);
+}
+
+async function runReenrichPass(): Promise<void> {
+  const pend = await db.pickOficinasToEnrich(ENRICH_PER_TICK);
+  for (const of of pend) {
+    try {
+      await reenrichOficina(of);
+    } catch (error) {
+      console.error("[Import] Re-enriquecimento falhou:", error);
+      await db.updateOficina(of.id, { enrichedAt: new Date() });
+    }
+  }
+}
+
+// Fase 1: coleta todas as páginas do Text Search (sem inserir ainda).
+async function collectPage(
+  job: Awaited<ReturnType<typeof db.pickNextImportJob>> & object
+): Promise<void> {
+  const params: Record<string, unknown> = job.nextPageToken
+    ? { pagetoken: job.nextPageToken }
+    : { query: `${job.termo} em ${job.cidade}, ${job.estado}, Brasil` };
+
+  let resp: TextSearchResponse;
+  try {
+    resp = await makeRequest<TextSearchResponse>(
+      "/maps/api/place/textsearch/json",
+      params
+    );
+  } catch (error) {
+    await db.updateImportJob(job.id, {
+      status: "erro",
+      erro: `Falha na busca Google: ${String(error)}`,
+    });
+    return;
+  }
+
+  if (resp.status === "INVALID_REQUEST" && job.nextPageToken) return; // token ainda não ativo
+
+  if (resp.status !== "OK" && resp.status !== "ZERO_RESULTS") {
+    await db.updateImportJob(job.id, {
+      status: "erro",
+      erro: `Google retornou ${resp.status}${resp.error_message ? `: ${resp.error_message}` : ""}`,
+    });
+    return;
+  }
+
+  const results = resp.results ?? [];
+  const acc: Candidato[] = [...(job.candidatos ?? [])];
+  const seen = new Set(acc.map(c => c.placeId));
+  for (const r of results) {
+    if (!r.place_id || seen.has(r.place_id)) continue;
+    seen.add(r.place_id);
+    acc.push({
+      placeId: r.place_id,
+      nome: r.name,
+      rating: typeof r.rating === "number" ? r.rating : 0,
+      urt: typeof r.user_ratings_total === "number" ? r.user_ratings_total : 0,
+      lat: r.geometry?.location?.lat,
+      lng: r.geometry?.location?.lng,
+      endereco: r.formatted_address,
+    });
+  }
+
+  if (resp.next_page_token) {
+    await db.updateImportJob(job.id, {
+      status: "rodando",
+      candidatos: acc,
+      nextPageToken: resp.next_page_token,
+      pagina: job.pagina + 1,
+      encontrados: acc.length,
+      erro: null,
+    });
+    return;
+  }
+
+  // Sem mais páginas: ranqueia (melhor avaliação primeiro) e corta no limite.
+  acc.sort((a, b) => b.rating - a.rating || b.urt - a.urt);
+  await db.updateImportJob(job.id, {
+    status: "rodando",
+    fase: "inserindo",
+    candidatos: acc.slice(0, job.limite),
+    nextPageToken: null,
+    pagina: job.pagina + 1,
+    encontrados: acc.length,
+    erro: null,
+  });
+}
+
+// Fase 2: insere os melhores aos poucos.
+async function insertBatch(
+  job: Awaited<ReturnType<typeof db.pickNextImportJob>> & object
+): Promise<void> {
+  const queue: Candidato[] = [...(job.candidatos ?? [])];
+  let importados = job.importados;
+  let duplicados = job.duplicados;
+  let processed = 0;
+
+  while (queue.length > 0 && processed < INSERT_PER_TICK) {
+    if (importados >= job.limite) break;
+    const cand = queue.shift()!;
+    processed += 1;
+    try {
+      if (await db.oficinaExistsByGooglePlaceId(cand.placeId)) {
+        duplicados += 1;
+        continue;
+      }
+      const { oficina, photoRef } = await buildOficina(
+        cand,
+        job.cidade,
+        job.estado
+      );
+      const id = await db.insertImportedOficina(oficina);
+      if (photoRef) await saveFachadaFoto(id, photoRef);
+      importados += 1;
+    } catch (error) {
+      console.error("[Import] Falha ao inserir oficina:", error);
+    }
+  }
+
+  const done = queue.length === 0 || importados >= job.limite;
+  await db.updateImportJob(job.id, {
+    status: done ? "concluido" : "rodando",
+    candidatos: queue,
+    importados,
+    duplicados,
+    erro: null,
+  });
+}
+
 export async function processNextImportBatch(): Promise<void> {
   if (isRunning) return;
   isRunning = true;
   try {
     const job = await db.pickNextImportJob();
-    if (!job) return;
 
-    if (job.importados >= job.limite) {
-      await db.updateImportJob(job.id, {
-        status: "concluido",
-        nextPageToken: null,
-      });
+    if (!job) {
+      await runReenrichPass();
       return;
     }
 
     if (job.status === "pendente") {
       await db.updateImportJob(job.id, { status: "rodando" });
     }
-
-    const params: Record<string, unknown> = job.nextPageToken
-      ? { pagetoken: job.nextPageToken }
-      : { query: `${job.termo} em ${job.cidade}, ${job.estado}, Brasil` };
-
-    let resp: TextSearchResponse;
-    try {
-      resp = await makeRequest<TextSearchResponse>(
-        "/maps/api/place/textsearch/json",
-        params
-      );
-    } catch (error) {
+    if (job.importados >= job.limite) {
       await db.updateImportJob(job.id, {
-        status: "erro",
-        erro: `Falha na busca Google: ${String(error)}`,
+        status: "concluido",
+        candidatos: [],
       });
       return;
     }
 
-    // Token de página recém-criado ainda não ativo: tenta de novo no próximo ciclo.
-    if (resp.status === "INVALID_REQUEST" && job.nextPageToken) {
-      return;
+    if (job.fase === "coletando") {
+      await collectPage(job);
+    } else {
+      await insertBatch(job);
     }
-
-    if (resp.status !== "OK" && resp.status !== "ZERO_RESULTS") {
-      await db.updateImportJob(job.id, {
-        status: "erro",
-        erro: `Google retornou ${resp.status}${resp.error_message ? `: ${resp.error_message}` : ""}`,
-      });
-      return;
-    }
-
-    const results = resp.results ?? [];
-    let importados = job.importados;
-    let duplicados = job.duplicados;
-
-    for (const place of results) {
-      if (importados >= job.limite) break;
-      if (!place.place_id) continue;
-      if (await db.oficinaExistsByGooglePlaceId(place.place_id)) {
-        duplicados += 1;
-        continue;
-      }
-      try {
-        await db.insertImportedOficina(
-          await buildOficina(place, job.cidade, job.estado)
-        );
-        importados += 1;
-      } catch (error) {
-        console.error("[Import] Falha ao inserir oficina:", error);
-      }
-    }
-
-    const reachedLimit = importados >= job.limite;
-    const hasMore = Boolean(resp.next_page_token) && !reachedLimit;
-    await db.updateImportJob(job.id, {
-      status: hasMore ? "rodando" : "concluido",
-      nextPageToken: hasMore ? resp.next_page_token ?? null : null,
-      pagina: job.pagina + 1,
-      encontrados: job.encontrados + results.length,
-      importados,
-      duplicados,
-      erro: null,
-    });
   } finally {
     isRunning = false;
   }
@@ -237,5 +425,5 @@ export function startImportWorker(): void {
       console.error("[Import] Erro no ciclo de importação:", error)
     );
   }, TICK_MS);
-  console.log("[Import] Worker de importação iniciado (1 lote/min).");
+  console.log("[Import] Worker de importação iniciado (1 ciclo/min).");
 }

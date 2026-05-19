@@ -478,6 +478,15 @@ export const appRouter = router({
         await db.cancelImportJob(input.id);
         return { success: true };
       }),
+
+    pendentesEnriquecimento: adminProcedure.query(async () => {
+      return { total: await db.countOficinasToEnrich() };
+    }),
+
+    reenriquecer: adminProcedure.mutation(async () => {
+      const total = await db.resetEnrichmentForImported();
+      return { total };
+    }),
   }),
 });
 

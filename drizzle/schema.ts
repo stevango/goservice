@@ -81,6 +81,9 @@ export const oficinas = mysqlTable("oficinas", {
   // Reputação
   scoreReputacao: decimal("scoreReputacao", { precision: 3, scale: 1 }).default("0.0"),
   totalAvaliacoes: int("totalAvaliacoes").default(0),
+
+  // Enriquecimento via Google Places: NULL = ainda precisa enriquecer.
+  enrichedAt: timestamp("enrichedAt"),
   
   // Status
   status: mysqlEnum("status", ["pendente", "ativa", "bloqueada", "rejeitada"]).default("pendente").notNull(),
@@ -223,6 +226,22 @@ export const importJobs = mysqlTable("import_jobs", {
     .default("pendente")
     .notNull(),
   limite: int("limite").default(60).notNull(),
+  // Worker em 2 fases: coleta todas as páginas, ranqueia por avaliação,
+  // depois insere os melhores primeiro.
+  fase: mysqlEnum("faseImport", ["coletando", "inserindo"])
+    .default("coletando")
+    .notNull(),
+  candidatos: json("candidatos").$type<
+    Array<{
+      placeId: string;
+      nome: string;
+      rating: number;
+      urt: number;
+      lat?: number;
+      lng?: number;
+      endereco?: string;
+    }>
+  >(),
   nextPageToken: text("nextPageToken"),
   pagina: int("pagina").default(0).notNull(),
   encontrados: int("encontrados").default(0).notNull(),
