@@ -9,6 +9,7 @@ import { useParams } from "wouter";
 import { MapPin, Star, Phone, Mail, Globe, Clock, CreditCard, Wrench, Car, MessageSquare, ArrowLeft } from "lucide-react";
 import { Link } from "wouter";
 import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS } from "@shared/types";
+import { OsmMap } from "@/components/OsmMap";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -401,6 +402,15 @@ export default function OficinaDetalhe() {
                   <br />
                   {oficina.cep && `CEP: ${oficina.cep}`}
                 </p>
+                {oficina.latitude && oficina.longitude && (
+                  <div className="mt-4">
+                    <OsmMap
+                      lat={Number(oficina.latitude)}
+                      lng={Number(oficina.longitude)}
+                      label={oficina.nomeFantasia}
+                    />
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
