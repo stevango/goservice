@@ -71,6 +71,20 @@ export const SEGMENTOS = [
       { value: "manutencao_placa_solar", label: "Manutenção / Limpeza de Painéis", termo: "manutenção de placas solares" },
     ],
   },
+  {
+    grupo: "Veículos — Lojas e Agências",
+    itens: [
+      { value: "loja_auto", label: "Automóveis", termo: "loja de carros" },
+      { value: "loja_moto", label: "Motos", termo: "loja de motos" },
+      { value: "loja_carro_eletrico", label: "Carro Elétrico", termo: "loja de carros elétricos" },
+      { value: "loja_nautico", label: "Náutico", termo: "loja de barcos" },
+      { value: "loja_caminhao", label: "Caminhões", termo: "concessionária de caminhões" },
+      { value: "loja_onibus", label: "Ônibus", termo: "venda de ônibus" },
+      { value: "loja_trator", label: "Tratores", termo: "concessionária de tratores" },
+      { value: "loja_quadriciclo_utv", label: "Quadriciclo e UTV", termo: "loja de quadriciclos" },
+      { value: "loja_triciclo", label: "Triciclos", termo: "loja de triciclos" },
+    ],
+  },
 ] as const;
 
 export type SegmentoInfo = { label: string; termo: string; grupo: string };
