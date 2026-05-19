@@ -17,6 +17,7 @@ import {
   ESTADOS_BRASIL,
   ESTADOS_BRASIL_NOMES,
   SEGMENTOS,
+  SEGMENTO_INFO,
   segmentoLabel,
 } from "@shared/types";
 import { Download, Loader2, RefreshCw, X } from "lucide-react";
@@ -32,11 +33,15 @@ const STATUS_STYLE: Record<string, string> = {
 };
 
 export default function AdminImportar() {
-  const [form, setForm] = useState({
-    segmento: "oficina_mecanica",
-    estado: "",
-    cidade: "",
-    limite: 60,
+  const [form, setForm] = useState(() => {
+    const sp = new URLSearchParams(window.location.search);
+    const seg = sp.get("segmento");
+    return {
+      segmento: seg && SEGMENTO_INFO[seg] ? seg : "oficina_mecanica",
+      estado: (sp.get("estado") || "").toUpperCase().slice(0, 2),
+      cidade: sp.get("cidade") || "",
+      limite: 60,
+    };
   });
   const [cidades, setCidades] = useState<string[]>([]);
   const [cidadesLoading, setCidadesLoading] = useState(false);

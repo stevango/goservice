@@ -1,4 +1,5 @@
-import { eq, and, like, or, sql, desc, asc, count, inArray, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, like, or, sql, desc, asc, count, inArray, isNull, isNotNull, type SQL } from "drizzle-orm";
+import { type AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { drizzle } from "drizzle-orm/mysql2";
 import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao, importJobs, ImportJob, InsertImportJob } from "../drizzle/schema";
 import { ENV } from './_core/env';
@@ -201,28 +202,138 @@ export async function listOficinasPublic(filters?: {
   );
 }
 
-export async function getOficinasMetrics() {
+export type DashboardMetrics = {
+  total: number;
+  ativas: number;
+  pendentes: number;
+  bloqueadas: number;
+  rejeitadas: number;
+  porSegmento: Array<{
+    segmento: string;
+    total: number;
+    ativas: number;
+    pendentes: number;
+  }>;
+  qualidade: {
+    comTelefone: number;
+    comWebsite: number;
+    comHorario: number;
+    comGeo: number;
+    comFoto: number;
+    enriquecidas: number;
+    semCnpj: number;
+    pendentesEnriquecimento: number;
+  };
+  topCidades: Array<{ cidade: string; estado: string; total: number }>;
+};
+
+export async function getOficinasMetrics(): Promise<DashboardMetrics> {
+  const vazio: DashboardMetrics = {
+    total: 0,
+    ativas: 0,
+    pendentes: 0,
+    bloqueadas: 0,
+    rejeitadas: 0,
+    porSegmento: [],
+    qualidade: {
+      comTelefone: 0,
+      comWebsite: 0,
+      comHorario: 0,
+      comGeo: 0,
+      comFoto: 0,
+      enriquecidas: 0,
+      semCnpj: 0,
+      pendentesEnriquecimento: 0,
+    },
+    topCidades: [],
+  };
   const db = await getDb();
-  if (!db) return { total: 0, ativas: 0, pendentes: 0, bloqueadas: 0, premium: 0, concessionaria: 0, padrao: 0 };
+  if (!db) return vazio;
 
-  const result = await db.select({
-    status: oficinas.status,
-    categoria: oficinas.categoria,
-    count: count()
-  }).from(oficinas).groupBy(oficinas.status, oficinas.categoria);
+  const m: DashboardMetrics = {
+    ...vazio,
+    porSegmento: [],
+    qualidade: { ...vazio.qualidade },
+    topCidades: [],
+  };
 
-  const metrics = { total: 0, ativas: 0, pendentes: 0, bloqueadas: 0, premium: 0, concessionaria: 0, padrao: 0 };
-  for (const row of result) {
-    const c = Number(row.count);
-    metrics.total += c;
-    if (row.status === 'ativa') metrics.ativas += c;
-    if (row.status === 'pendente') metrics.pendentes += c;
-    if (row.status === 'bloqueada') metrics.bloqueadas += c;
-    if (row.categoria === 'premium') metrics.premium += c;
-    if (row.categoria === 'concessionaria') metrics.concessionaria += c;
-    if (row.categoria === 'padrao') metrics.padrao += c;
+  const statusRows = await db
+    .select({ status: oficinas.status, count: count() })
+    .from(oficinas)
+    .groupBy(oficinas.status);
+  for (const r of statusRows) {
+    const c = Number(r.count);
+    m.total += c;
+    if (r.status === "ativa") m.ativas += c;
+    else if (r.status === "pendente") m.pendentes += c;
+    else if (r.status === "bloqueada") m.bloqueadas += c;
+    else if (r.status === "rejeitada") m.rejeitadas += c;
   }
-  return metrics;
+
+  const segRows = await db
+    .select({
+      segmento: oficinas.segmento,
+      status: oficinas.status,
+      count: count(),
+    })
+    .from(oficinas)
+    .groupBy(oficinas.segmento, oficinas.status);
+  const segMap = new Map<string, DashboardMetrics["porSegmento"][number]>();
+  for (const r of segRows) {
+    const seg = r.segmento || "desconhecido";
+    const e =
+      segMap.get(seg) ?? { segmento: seg, total: 0, ativas: 0, pendentes: 0 };
+    const c = Number(r.count);
+    e.total += c;
+    if (r.status === "ativa") e.ativas += c;
+    if (r.status === "pendente") e.pendentes += c;
+    segMap.set(seg, e);
+  }
+  m.porSegmento = Array.from(segMap.values()).sort(
+    (a, b) => b.total - a.total
+  );
+
+  const cnt = async (cond: SQL): Promise<number> => {
+    const r = await db.select({ c: count() }).from(oficinas).where(cond);
+    return Number(r[0]?.c || 0);
+  };
+  const naoVazio = (col: AnyMySqlColumn) =>
+    and(isNotNull(col), sql`${col} <> ''`) as SQL;
+
+  m.qualidade.comTelefone = await cnt(naoVazio(oficinas.telefone));
+  m.qualidade.comWebsite = await cnt(naoVazio(oficinas.website));
+  m.qualidade.comHorario = await cnt(naoVazio(oficinas.horarioFuncionamento));
+  m.qualidade.comGeo = await cnt(isNotNull(oficinas.latitude));
+  m.qualidade.enriquecidas = await cnt(isNotNull(oficinas.enrichedAt));
+  m.qualidade.semCnpj = await cnt(
+    or(isNull(oficinas.cnpj), eq(oficinas.cnpj, "")) as SQL
+  );
+  m.qualidade.pendentesEnriquecimento = await cnt(
+    and(isNotNull(oficinas.googlePlaceId), isNull(oficinas.enrichedAt)) as SQL
+  );
+  const fotoRows = await db
+    .select({ c: sql<number>`count(distinct ${oficinaDocumentos.oficinaId})` })
+    .from(oficinaDocumentos)
+    .where(like(oficinaDocumentos.tipo, "foto%"));
+  m.qualidade.comFoto = Number(fotoRows[0]?.c || 0);
+
+  const cidRows = await db
+    .select({
+      cidade: oficinas.cidade,
+      estado: oficinas.estado,
+      count: count(),
+    })
+    .from(oficinas)
+    .groupBy(oficinas.cidade, oficinas.estado)
+    .orderBy(sql`count(*) desc`)
+    .limit(8);
+  m.topCidades = cidRows.map(r => ({
+    cidade: r.cidade || "—",
+    estado: r.estado || "",
+    total: Number(r.count),
+  }));
+
+  return m;
 }
 
 // ==================== AVALIAÇÕES ====================

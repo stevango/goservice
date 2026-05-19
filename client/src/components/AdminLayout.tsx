@@ -10,7 +10,7 @@ import { Separator } from "@/components/ui/separator";
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/atendimento", label: "Atendimento", icon: Headphones },
-  { href: "/admin/oficinas", label: "Oficinas", icon: Store },
+  { href: "/admin/oficinas", label: "Prestadores", icon: Store },
   { href: "/admin/importar", label: "Importar", icon: Download },
   { href: "/admin/avaliacoes", label: "Avaliações", icon: Star },
   { href: "/admin/b2b", label: "Clientes B2B", icon: Users },
@@ -59,8 +59,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Building2 className="w-4 h-4 text-white" />
             </div>
             <div>
-              <span className="font-bold text-sm">Rede Oficinas</span>
-              <p className="text-[10px] text-muted-foreground -mt-0.5">Painel Administrativo</p>
+              <span className="font-bold text-sm">GO SERVICE</span>
+              <p className="text-[10px] text-muted-foreground -mt-0.5">Painel da Rede</p>
             </div>
           </Link>
         </div>
