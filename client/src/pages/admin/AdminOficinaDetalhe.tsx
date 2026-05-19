@@ -6,10 +6,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useParams } from "wouter";
 import { Link } from "wouter";
-import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock, Globe, Image as ImageIcon } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
-import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS } from "@shared/types";
+import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, segmentoLabel } from "@shared/types";
 import { OsmMap } from "@/components/OsmMap";
 
 export default function AdminOficinaDetalhe() {
@@ -85,9 +85,18 @@ export default function AdminOficinaDetalhe() {
           <CardHeader><CardTitle className="text-base">Dados Cadastrais</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-2">
+              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Segmento</span>{segmentoLabel(data.segmento)}</div>
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Telefone</span>{data.telefone || "—"}</div>
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">WhatsApp</span>{data.whatsapp || "—"}</div>
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">E-mail</span>{data.email || "—"}</div>
+              <div className="p-2 rounded bg-muted/50">
+                <span className="text-xs text-muted-foreground block">Website</span>
+                {data.website ? (
+                  <a href={data.website} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 break-all">
+                    <Globe className="w-3.5 h-3.5 shrink-0" />{data.website}
+                  </a>
+                ) : "—"}
+              </div>
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Representante</span>{data.nomeRepresentante || "—"}</div>
             </div>
           </CardContent>
@@ -161,6 +170,51 @@ export default function AdminOficinaDetalhe() {
                 ))}
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Horário de Funcionamento */}
+        <Card>
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4" /> Horário de Funcionamento</CardTitle></CardHeader>
+          <CardContent className="text-sm">
+            {data.horarioFuncionamento ? (
+              <div className="space-y-0.5">
+                {data.horarioFuncionamento.split("\n").map((linha, i) => (
+                  <p key={i} className="text-muted-foreground">{linha}</p>
+                ))}
+              </div>
+            ) : (
+              <p className="text-muted-foreground">Não informado pelo Google.</p>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Sobre */}
+        <Card>
+          <CardHeader><CardTitle className="text-base">Sobre</CardTitle></CardHeader>
+          <CardContent className="text-sm text-muted-foreground">
+            {data.descricao || "—"}
+          </CardContent>
+        </Card>
+
+        {/* Galeria */}
+        <Card className="lg:col-span-2">
+          <CardHeader><CardTitle className="text-base flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Galeria</CardTitle></CardHeader>
+          <CardContent>
+            {(() => {
+              const fotos = (data.documentos || []).filter(d => d.tipo.startsWith("foto"));
+              return fotos.length > 0 ? (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {fotos.map(f => (
+                    <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer" className="block aspect-square rounded-lg overflow-hidden border">
+                      <img src={f.url} alt={f.nome || "Foto"} className="w-full h-full object-cover" loading="lazy" />
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Nenhuma foto importada.</p>
+              );
+            })()}
           </CardContent>
         </Card>
 
