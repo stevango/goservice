@@ -50,6 +50,15 @@ export const SEGMENTOS = [
     grupo: "Pet",
     itens: [
       { value: "clinica_veterinaria", label: "Clínica Veterinária", termo: "clínica veterinária" },
+      { value: "hospital_veterinario", label: "Hospital Veterinário 24h", termo: "hospital veterinário 24 horas" },
+      { value: "farmacia_veterinaria", label: "Farmácia Veterinária", termo: "farmácia veterinária" },
+      { value: "laboratorio_veterinario", label: "Laboratório Veterinário", termo: "laboratório de análises veterinárias" },
+      { value: "fisioterapia_animal", label: "Fisioterapia / Reabilitação Animal", termo: "fisioterapia veterinária" },
+      { value: "pet_shop", label: "Pet Shop", termo: "pet shop" },
+      { value: "banho_tosa", label: "Banho e Tosa", termo: "banho e tosa" },
+      { value: "hotel_pet", label: "Hotel / Creche Pet", termo: "hotel para cães" },
+      { value: "adestramento", label: "Adestramento", termo: "adestrador de cães" },
+      { value: "transporte_pet", label: "Transporte / Táxi Pet", termo: "transporte de animais" },
     ],
   },
 ] as const;
