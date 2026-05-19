@@ -46,6 +46,12 @@ export const SEGMENTOS = [
       { value: "limpeza_emergencial", label: "Limpeza Emergencial", termo: "serviço de limpeza" },
     ],
   },
+  {
+    grupo: "Pet",
+    itens: [
+      { value: "clinica_veterinaria", label: "Clínica Veterinária", termo: "clínica veterinária" },
+    ],
+  },
 ] as const;
 
 export type SegmentoInfo = { label: string; termo: string; grupo: string };
