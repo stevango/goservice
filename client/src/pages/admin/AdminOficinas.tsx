@@ -83,15 +83,16 @@ export default function AdminOficinas() {
               <TableHead>Cidade/UF</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Status</TableHead>
-              <TableHead>Score</TableHead>
+              <TableHead>Google</TableHead>
+              <TableHead>Aval. Google</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Carregando...</TableCell></TableRow>
             ) : data?.oficinas.length === 0 ? (
-              <TableRow><TableCell colSpan={6} className="text-center py-8 text-muted-foreground">Nenhuma oficina encontrada</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center py-8 text-muted-foreground">Nenhuma oficina encontrada</TableCell></TableRow>
             ) : (
               data?.oficinas.map(oficina => (
                 <TableRow key={oficina.id} className="hover:bg-muted/20">
@@ -107,6 +108,7 @@ export default function AdminOficinas() {
                   </TableCell>
                   <TableCell>{statusBadge(oficina.status)}</TableCell>
                   <TableCell className="text-sm font-medium">{Number(oficina.scoreReputacao).toFixed(1)}</TableCell>
+                  <TableCell className="text-sm">{oficina.totalAvaliacoes ?? 0}</TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">
                       <Link href={`/admin/oficinas/${oficina.id}`}>

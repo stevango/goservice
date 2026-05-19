@@ -10,6 +10,7 @@ import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock
 import { useState } from "react";
 import { toast } from "sonner";
 import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS } from "@shared/types";
+import { OsmMap } from "@/components/OsmMap";
 
 export default function AdminOficinaDetalhe() {
   const params = useParams<{ id: string }>();
@@ -99,7 +100,18 @@ export default function AdminOficinaDetalhe() {
             <p>{data.logradouro}{data.numero ? `, ${data.numero}` : ""}{data.complemento ? ` - ${data.complemento}` : ""}</p>
             <p>{data.bairro} — {data.cidade}/{data.estado}</p>
             <p className="text-muted-foreground">CEP: {data.cep || "—"}</p>
-            {data.latitude && <p className="text-xs text-muted-foreground mt-2">Lat: {data.latitude}, Lng: {data.longitude}</p>}
+            {data.latitude && data.longitude && (
+              <div className="mt-3">
+                <OsmMap
+                  lat={Number(data.latitude)}
+                  lng={Number(data.longitude)}
+                  label={data.nomeFantasia}
+                />
+                <p className="text-xs text-muted-foreground mt-2">
+                  Lat: {data.latitude}, Lng: {data.longitude}
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
