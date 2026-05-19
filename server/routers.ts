@@ -214,6 +214,9 @@ export const appRouter = router({
       parcelamentoFranquia: z.number().optional(),
       fornecePecas: z.enum(["oficina", "seguradora", "cliente", "ambos"]).optional(),
       garantiaServico: z.string().optional(),
+      segmento: z.string().optional(),
+      descricao: z.string().optional(),
+      horarioFuncionamento: z.string().optional(),
       etapaCadastro: z.enum(["dados", "endereco", "documentos", "fotos", "contrato", "completo"]).optional(),
     })).mutation(async ({ ctx, input }) => {
       const oficina = await db.getOficinaById(input.id);

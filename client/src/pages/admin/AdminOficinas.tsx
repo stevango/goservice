@@ -7,7 +7,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
-import { Search, Eye, CheckCircle2, XCircle, Clock, Ban, Star, Loader2 } from "lucide-react";
+import { DropdownMenu, DropdownMenuTrigger, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { Search, Eye, CheckCircle2, XCircle, Clock, Ban, Star, Loader2, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ESTADOS_BRASIL, SEGMENTOS, segmentoLabel } from "@shared/types";
@@ -152,30 +153,36 @@ export default function AdminOficinas() {
                           <Eye className="w-4 h-4" />
                         </Button>
                       </Link>
-                      {oficina.status === "pendente" && (
-                        <Button
-                          variant="ghost" size="sm" className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                          onClick={() => alterarStatus.mutate({ id: oficina.id, status: "ativa" })}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {oficina.status === "ativa" && (
-                        <Button
-                          variant="ghost" size="sm" className="h-8 w-8 p-0 text-red-600 hover:text-red-700"
-                          onClick={() => alterarStatus.mutate({ id: oficina.id, status: "bloqueada" })}
-                        >
-                          <Ban className="w-4 h-4" />
-                        </Button>
-                      )}
-                      {oficina.status === "bloqueada" && (
-                        <Button
-                          variant="ghost" size="sm" className="h-8 w-8 p-0 text-green-600 hover:text-green-700"
-                          onClick={() => alterarStatus.mutate({ id: oficina.id, status: "ativa" })}
-                        >
-                          <CheckCircle2 className="w-4 h-4" />
-                        </Button>
-                      )}
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                            <MoreVertical className="w-4 h-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          {oficina.status !== "ativa" && (
+                            <DropdownMenuItem onClick={() => alterarStatus.mutate({ id: oficina.id, status: "ativa" })}>
+                              <CheckCircle2 className="w-4 h-4 mr-2 text-green-600" /> Aprovar (ativar)
+                            </DropdownMenuItem>
+                          )}
+                          {oficina.status !== "pendente" && (
+                            <DropdownMenuItem onClick={() => alterarStatus.mutate({ id: oficina.id, status: "pendente" })}>
+                              <Clock className="w-4 h-4 mr-2 text-yellow-600" /> Voltar para pendente
+                            </DropdownMenuItem>
+                          )}
+                          <DropdownMenuSeparator />
+                          {oficina.status !== "bloqueada" && (
+                            <DropdownMenuItem onClick={() => alterarStatus.mutate({ id: oficina.id, status: "bloqueada" })}>
+                              <Ban className="w-4 h-4 mr-2 text-red-600" /> Bloquear
+                            </DropdownMenuItem>
+                          )}
+                          {oficina.status !== "rejeitada" && (
+                            <DropdownMenuItem onClick={() => alterarStatus.mutate({ id: oficina.id, status: "rejeitada" })}>
+                              <XCircle className="w-4 h-4 mr-2 text-muted-foreground" /> Rejeitar
+                            </DropdownMenuItem>
+                          )}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </TableCell>
                 </TableRow>

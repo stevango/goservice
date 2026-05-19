@@ -6,10 +6,39 @@ import { Textarea } from "@/components/ui/textarea";
 import { trpc } from "@/lib/trpc";
 import { useParams } from "wouter";
 import { Link } from "wouter";
-import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock, Globe, Image as ImageIcon, Instagram } from "lucide-react";
+import { ArrowLeft, Star, MapPin, Phone, Mail, CheckCircle2, XCircle, Ban, Clock, Globe, Image as ImageIcon, Instagram, Pencil, Save } from "lucide-react";
+
+function Campo({
+  label,
+  valor,
+  editando,
+  onChange,
+  full,
+}: {
+  label: string;
+  valor?: string | null;
+  editando: boolean;
+  onChange: (v: string) => void;
+  full?: boolean;
+}) {
+  return (
+    <div className={`p-2 rounded bg-muted/50 ${full ? "col-span-2" : ""}`}>
+      <span className="text-xs text-muted-foreground block">{label}</span>
+      {editando ? (
+        <input
+          value={valor ?? ""}
+          onChange={e => onChange(e.target.value)}
+          className="w-full bg-transparent border-b border-input outline-none text-sm py-0.5 focus:border-primary"
+        />
+      ) : (
+        <span>{valor || "—"}</span>
+      )}
+    </div>
+  );
+}
 import { useState } from "react";
 import { toast } from "sonner";
-import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, segmentoLabel, traduzHorario, ehInstagram } from "@shared/types";
+import { TIPOS_VEICULOS, TIPOS_SERVICOS, CATEGORIAS_OFICINA, FORNECE_PECAS_OPTIONS, SEGMENTOS, segmentoLabel, traduzHorario, ehInstagram } from "@shared/types";
 import { OsmMap } from "@/components/OsmMap";
 import { Lightbox } from "@/components/Lightbox";
 
@@ -18,10 +47,16 @@ export default function AdminOficinaDetalhe() {
   const id = Number(params.id);
   const [observacoes, setObservacoes] = useState("");
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [form, setForm] = useState<Record<string, string>>({});
 
   const { data, isLoading, refetch } = trpc.oficinas.detalheAdmin.useQuery({ id });
   const alterarStatus = trpc.oficinas.alterarStatus.useMutation({
     onSuccess: () => { toast.success("Status alterado com sucesso"); refetch(); },
+    onError: (err) => toast.error(err.message),
+  });
+  const atualizar = trpc.oficinas.atualizar.useMutation({
+    onSuccess: () => { toast.success("Dados salvos"); setEditando(false); refetch(); },
     onError: (err) => toast.error(err.message),
   });
 
@@ -39,6 +74,31 @@ export default function AdminOficinaDetalhe() {
   const instaUrl = ehInstagram(data.website) ? data.website : null;
   const siteUrl = data.website && !ehInstagram(data.website) ? data.website : null;
 
+  const reg = data as unknown as Record<string, unknown>;
+  const campo = (field: string) => ({
+    editando,
+    valor: editando
+      ? form[field] ?? ""
+      : reg[field] == null
+        ? ""
+        : String(reg[field]),
+    onChange: (v: string) => setForm(f => ({ ...f, [field]: v })),
+  });
+  const CAMPOS_EDIT = [
+    "nomeFantasia", "razaoSocial", "cnpj", "telefone", "whatsapp", "email",
+    "website", "nomeRepresentante", "cep", "logradouro", "numero",
+    "complemento", "bairro", "cidade", "estado", "banco", "agencia",
+    "contaCorrente", "pixChave", "garantiaServico", "segmento",
+    "descricao", "horarioFuncionamento",
+  ];
+  const iniciarEdicao = () => {
+    const seed: Record<string, string> = {};
+    for (const k of CAMPOS_EDIT) seed[k] = reg[k] == null ? "" : String(reg[k]);
+    setForm(seed);
+    setEditando(true);
+  };
+  const salvar = () => atualizar.mutate({ id, ...form });
+
   return (
     <AdminLayout>
       <Link href="/admin/oficinas" className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground mb-6">
@@ -47,9 +107,35 @@ export default function AdminOficinaDetalhe() {
 
       {/* Header */}
       <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-bold">{data.nomeFantasia}</h1>
-          <p className="text-muted-foreground">{data.razaoSocial} — {data.cnpj}</p>
+        <div className="flex-1 mr-4">
+          {editando ? (
+            <div className="space-y-1.5 max-w-md">
+              <input
+                value={form.nomeFantasia ?? ""}
+                onChange={e => setForm(f => ({ ...f, nomeFantasia: e.target.value }))}
+                className="text-2xl font-bold w-full bg-transparent border-b border-input outline-none focus:border-primary"
+              />
+              <div className="flex gap-2">
+                <input
+                  value={form.razaoSocial ?? ""}
+                  onChange={e => setForm(f => ({ ...f, razaoSocial: e.target.value }))}
+                  placeholder="Razão social"
+                  className="flex-1 text-sm text-muted-foreground bg-transparent border-b border-input outline-none"
+                />
+                <input
+                  value={form.cnpj ?? ""}
+                  onChange={e => setForm(f => ({ ...f, cnpj: e.target.value }))}
+                  placeholder="CNPJ"
+                  className="w-40 text-sm text-muted-foreground bg-transparent border-b border-input outline-none"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <h1 className="text-2xl font-bold">{data.nomeFantasia}</h1>
+              <p className="text-muted-foreground">{data.razaoSocial} — {data.cnpj}</p>
+            </>
+          )}
           <div className="flex items-center gap-3 mt-2">
             <Badge className={`${
               data.status === "ativa" ? "bg-green-100 text-green-700" :
@@ -65,21 +151,42 @@ export default function AdminOficinaDetalhe() {
             </span>
           </div>
         </div>
-        <div className="flex gap-2">
-          {data.status !== "ativa" && (
-            <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={() => alterarStatus.mutate({ id, status: "ativa", observacoes })}>
-              <CheckCircle2 className="w-4 h-4" /> Aprovar
-            </Button>
-          )}
-          {data.status !== "bloqueada" && (
-            <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => alterarStatus.mutate({ id, status: "bloqueada", observacoes })}>
-              <Ban className="w-4 h-4" /> Bloquear
-            </Button>
-          )}
-          {data.status !== "rejeitada" && (
-            <Button size="sm" variant="outline" className="gap-1.5" onClick={() => alterarStatus.mutate({ id, status: "rejeitada", observacoes })}>
-              <XCircle className="w-4 h-4" /> Rejeitar
-            </Button>
+        <div className="flex flex-wrap gap-2 justify-end">
+          {editando ? (
+            <>
+              <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" disabled={atualizar.isPending} onClick={salvar}>
+                <Save className="w-4 h-4" /> Salvar
+              </Button>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setEditando(false)}>
+                <XCircle className="w-4 h-4" /> Cancelar
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button size="sm" variant="outline" className="gap-1.5" onClick={iniciarEdicao}>
+                <Pencil className="w-4 h-4" /> Editar
+              </Button>
+              {data.status !== "ativa" && (
+                <Button size="sm" className="gap-1.5 bg-green-600 hover:bg-green-700" onClick={() => alterarStatus.mutate({ id, status: "ativa", observacoes })}>
+                  <CheckCircle2 className="w-4 h-4" /> Aprovar
+                </Button>
+              )}
+              {data.status !== "pendente" && (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => alterarStatus.mutate({ id, status: "pendente", observacoes })}>
+                  <Clock className="w-4 h-4" /> Voltar p/ pendente
+                </Button>
+              )}
+              {data.status !== "bloqueada" && (
+                <Button size="sm" variant="destructive" className="gap-1.5" onClick={() => alterarStatus.mutate({ id, status: "bloqueada", observacoes })}>
+                  <Ban className="w-4 h-4" /> Bloquear
+                </Button>
+              )}
+              {data.status !== "rejeitada" && (
+                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => alterarStatus.mutate({ id, status: "rejeitada", observacoes })}>
+                  <XCircle className="w-4 h-4" /> Rejeitar
+                </Button>
+              )}
+            </>
           )}
         </div>
       </div>
@@ -90,27 +197,52 @@ export default function AdminOficinaDetalhe() {
           <CardHeader><CardTitle className="text-base">Dados Cadastrais</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Segmento</span>{segmentoLabel(data.segmento)}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Telefone</span>{data.telefone || "—"}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">WhatsApp</span>{data.whatsapp || "—"}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">E-mail</span>{data.email || "—"}</div>
               <div className="p-2 rounded bg-muted/50">
-                <span className="text-xs text-muted-foreground block">Website</span>
-                {siteUrl ? (
-                  <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 break-all">
-                    <Globe className="w-3.5 h-3.5 shrink-0" />{siteUrl}
-                  </a>
-                ) : "—"}
+                <span className="text-xs text-muted-foreground block">Segmento</span>
+                {editando ? (
+                  <select
+                    value={form.segmento ?? ""}
+                    onChange={e => setForm(f => ({ ...f, segmento: e.target.value }))}
+                    className="w-full bg-transparent border-b border-input outline-none text-sm py-0.5"
+                  >
+                    {SEGMENTOS.map(g => (
+                      <optgroup key={g.grupo} label={g.grupo}>
+                        {g.itens.map(it => (
+                          <option key={it.value} value={it.value}>{it.label}</option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                ) : (
+                  segmentoLabel(data.segmento)
+                )}
               </div>
-              <div className="p-2 rounded bg-muted/50">
-                <span className="text-xs text-muted-foreground block">Instagram</span>
-                {instaUrl ? (
-                  <a href={instaUrl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline inline-flex items-center gap-1 break-all">
-                    <Instagram className="w-3.5 h-3.5 shrink-0" />{instaUrl}
-                  </a>
-                ) : "—"}
-              </div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Representante</span>{data.nomeRepresentante || "—"}</div>
+              <Campo label="Telefone" {...campo("telefone")} />
+              <Campo label="WhatsApp" {...campo("whatsapp")} />
+              <Campo label="E-mail" {...campo("email")} />
+              {editando ? (
+                <Campo label="Website / Instagram" full {...campo("website")} />
+              ) : (
+                <>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="text-xs text-muted-foreground block">Website</span>
+                    {siteUrl ? (
+                      <a href={siteUrl} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline inline-flex items-center gap-1 break-all">
+                        <Globe className="w-3.5 h-3.5 shrink-0" />{siteUrl}
+                      </a>
+                    ) : "—"}
+                  </div>
+                  <div className="p-2 rounded bg-muted/50">
+                    <span className="text-xs text-muted-foreground block">Instagram</span>
+                    {instaUrl ? (
+                      <a href={instaUrl} target="_blank" rel="noopener noreferrer" className="text-pink-600 hover:underline inline-flex items-center gap-1 break-all">
+                        <Instagram className="w-3.5 h-3.5 shrink-0" />{instaUrl}
+                      </a>
+                    ) : "—"}
+                  </div>
+                </>
+              )}
+              <Campo label="Representante" {...campo("nomeRepresentante")} />
             </div>
           </CardContent>
         </Card>
@@ -119,9 +251,23 @@ export default function AdminOficinaDetalhe() {
         <Card>
           <CardHeader><CardTitle className="text-base">Endereço</CardTitle></CardHeader>
           <CardContent className="text-sm">
-            <p>{data.logradouro}{data.numero ? `, ${data.numero}` : ""}{data.complemento ? ` - ${data.complemento}` : ""}</p>
-            <p>{data.bairro} — {data.cidade}/{data.estado}</p>
-            <p className="text-muted-foreground">CEP: {data.cep || "—"}</p>
+            {editando ? (
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                <Campo label="Logradouro" full {...campo("logradouro")} />
+                <Campo label="Número" {...campo("numero")} />
+                <Campo label="Complemento" {...campo("complemento")} />
+                <Campo label="Bairro" {...campo("bairro")} />
+                <Campo label="CEP" {...campo("cep")} />
+                <Campo label="Cidade" {...campo("cidade")} />
+                <Campo label="Estado (UF)" {...campo("estado")} />
+              </div>
+            ) : (
+              <>
+                <p>{data.logradouro}{data.numero ? `, ${data.numero}` : ""}{data.complemento ? ` - ${data.complemento}` : ""}</p>
+                <p>{data.bairro} — {data.cidade}/{data.estado}</p>
+                <p className="text-muted-foreground">CEP: {data.cep || "—"}</p>
+              </>
+            )}
             {data.latitude && data.longitude && (
               <div className="mt-3">
                 <OsmMap
@@ -145,7 +291,7 @@ export default function AdminOficinaDetalhe() {
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Franquia</span>{data.franquiaAntes ? "Antes do serviço" : "Após o serviço"}</div>
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Parcelamento</span>{data.parcelamentoFranquia}x</div>
               <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Peças</span>{fornecePecasInfo?.label || "—"}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Garantia</span>{data.garantiaServico || "—"}</div>
+              <Campo label="Garantia" {...campo("garantiaServico")} />
             </div>
           </CardContent>
         </Card>
@@ -155,10 +301,10 @@ export default function AdminOficinaDetalhe() {
           <CardHeader><CardTitle className="text-base">Dados Bancários</CardTitle></CardHeader>
           <CardContent className="space-y-2 text-sm">
             <div className="grid grid-cols-2 gap-2">
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Banco</span>{data.banco || "—"}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Agência</span>{data.agencia || "—"}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">Conta</span>{data.contaCorrente || "—"}</div>
-              <div className="p-2 rounded bg-muted/50"><span className="text-xs text-muted-foreground block">PIX ({data.pixTipo || "—"})</span>{data.pixChave || "—"}</div>
+              <Campo label="Banco" {...campo("banco")} />
+              <Campo label="Agência" {...campo("agencia")} />
+              <Campo label="Conta" {...campo("contaCorrente")} />
+              <Campo label={`PIX (${data.pixTipo || "—"})`} {...campo("pixChave")} />
             </div>
           </CardContent>
         </Card>
@@ -190,7 +336,14 @@ export default function AdminOficinaDetalhe() {
         <Card>
           <CardHeader><CardTitle className="text-base flex items-center gap-2"><Clock className="w-4 h-4" /> Horário de Funcionamento</CardTitle></CardHeader>
           <CardContent className="text-sm">
-            {data.horarioFuncionamento ? (
+            {editando ? (
+              <Textarea
+                rows={7}
+                value={form.horarioFuncionamento ?? ""}
+                onChange={e => setForm(f => ({ ...f, horarioFuncionamento: e.target.value }))}
+                placeholder={"Segunda-feira: 08:00 – 18:00\n..."}
+              />
+            ) : data.horarioFuncionamento ? (
               <div className="space-y-0.5">
                 {traduzHorario(data.horarioFuncionamento).split("\n").map((linha, i) => (
                   <p key={i} className="text-muted-foreground">{linha}</p>
@@ -206,7 +359,15 @@ export default function AdminOficinaDetalhe() {
         <Card>
           <CardHeader><CardTitle className="text-base">Sobre</CardTitle></CardHeader>
           <CardContent className="text-sm text-muted-foreground">
-            {data.descricao || "—"}
+            {editando ? (
+              <Textarea
+                rows={4}
+                value={form.descricao ?? ""}
+                onChange={e => setForm(f => ({ ...f, descricao: e.target.value }))}
+              />
+            ) : (
+              data.descricao || "—"
+            )}
           </CardContent>
         </Card>
 
