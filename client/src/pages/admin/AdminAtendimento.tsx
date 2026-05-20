@@ -47,6 +47,11 @@ import {
   type AtendimentoEtapa,
 } from "@shared/types";
 
+// Radix Select não aceita value="" em SelectItem. Usamos sentinelas
+// e convertemos para string vazia (= "sem filtro") ao mudar.
+const ALL = "__all__";
+const NENHUMA = "__none__";
+
 type Prospect = {
   id: number;
   nomeFantasia: string;
@@ -123,12 +128,15 @@ export default function AdminAtendimento() {
               onChange={e => setSearch(e.target.value)}
               className="w-64"
             />
-            <Select value={segmento} onValueChange={setSegmento}>
+            <Select
+              value={segmento || ALL}
+              onValueChange={v => setSegmento(v === ALL ? "" : v)}
+            >
               <SelectTrigger className="w-56">
                 <SelectValue placeholder="Todos os segmentos" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todos os segmentos</SelectItem>
+                <SelectItem value={ALL}>Todos os segmentos</SelectItem>
                 {SEGMENTOS.map(g => (
                   <SelectGroup key={g.grupo}>
                     <SelectLabel>{g.grupo}</SelectLabel>
@@ -141,12 +149,15 @@ export default function AdminAtendimento() {
                 ))}
               </SelectContent>
             </Select>
-            <Select value={estado} onValueChange={setEstado}>
+            <Select
+              value={estado || ALL}
+              onValueChange={v => setEstado(v === ALL ? "" : v)}
+            >
               <SelectTrigger className="w-28">
                 <SelectValue placeholder="UF" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Todas</SelectItem>
+                <SelectItem value={ALL}>Todas</SelectItem>
                 {ESTADOS_BRASIL.map(e => (
                   <SelectItem key={e} value={e}>
                     {e}
@@ -440,12 +451,15 @@ function ProspectDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={novaEtapa} onValueChange={setNovaEtapa}>
+                <Select
+                  value={novaEtapa || NENHUMA}
+                  onValueChange={v => setNovaEtapa(v === NENHUMA ? "" : v)}
+                >
                   <SelectTrigger>
                     <SelectValue placeholder="Mudar etapa (opcional)" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="">Sem mudar etapa</SelectItem>
+                    <SelectItem value={NENHUMA}>Sem mudar etapa</SelectItem>
                     {ATENDIMENTO_ETAPAS.map(et => (
                       <SelectItem key={et} value={et}>
                         {ETAPA_LABEL[et]}
