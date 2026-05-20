@@ -43,6 +43,13 @@
       "when": 1779153330545,
       "tag": "0005_real_hemingway",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1779305473912,
+      "tag": "0006_ambiguous_spiral",
+      "breakpoints": true
     }
   ]
 }

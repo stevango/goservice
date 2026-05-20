@@ -1,7 +1,7 @@
 import { eq, and, like, or, sql, desc, asc, count, inArray, isNull, isNotNull, type SQL } from "drizzle-orm";
 import { type AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao, importJobs, ImportJob, InsertImportJob } from "../drizzle/schema";
+import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao, importJobs, ImportJob, InsertImportJob, atendimentoEventos, AtendimentoEvento, InsertAtendimentoEvento } from "../drizzle/schema";
 import { ENV } from './_core/env';
 import { encryptOficinaFields, decryptOficinaFields } from './_core/crypto';
 import { cached, invalidatePrefix } from './_core/cache';
@@ -599,4 +599,97 @@ export async function cancelImportJob(id: number): Promise<void> {
     .update(importJobs)
     .set({ status: "cancelado" })
     .where(and(eq(importJobs.id, id), inArray(importJobs.status, ["pendente", "rodando"])));
+}
+
+// ==================== ATENDIMENTO (Centro de Conversão) ====================
+
+type ProspectFilters = {
+  search?: string;
+  cidade?: string;
+  estado?: string;
+  segmento?: string;
+  etapas?: string[];
+};
+
+function prospectConditions(f: ProspectFilters): SQL | undefined {
+  const conds: SQL[] = [];
+  if (f.search) {
+    conds.push(
+      or(
+        like(oficinas.nomeFantasia, `%${f.search}%`),
+        like(oficinas.razaoSocial, `%${f.search}%`),
+        like(oficinas.cidade, `%${f.search}%`)
+      ) as SQL
+    );
+  }
+  if (f.cidade) conds.push(like(oficinas.cidade, `%${f.cidade}%`));
+  if (f.estado) conds.push(eq(oficinas.estado, f.estado));
+  if (f.segmento) conds.push(eq(oficinas.segmento, f.segmento));
+  if (f.etapas && f.etapas.length > 0) {
+    conds.push(inArray(oficinas.etapaAtendimento, f.etapas as Array<typeof oficinas.etapaAtendimento.enumValues[number]>));
+  }
+  return conds.length ? (and(...conds) as SQL) : undefined;
+}
+
+export async function listProspects(filters: ProspectFilters = {}, limit = 300) {
+  const db = await getDb();
+  if (!db) return [];
+  const where = prospectConditions(filters);
+  const q = db
+    .select({
+      id: oficinas.id,
+      nomeFantasia: oficinas.nomeFantasia,
+      razaoSocial: oficinas.razaoSocial,
+      segmento: oficinas.segmento,
+      cidade: oficinas.cidade,
+      estado: oficinas.estado,
+      telefone: oficinas.telefone,
+      whatsapp: oficinas.whatsapp,
+      email: oficinas.email,
+      website: oficinas.website,
+      scoreReputacao: oficinas.scoreReputacao,
+      totalAvaliacoes: oficinas.totalAvaliacoes,
+      etapaAtendimento: oficinas.etapaAtendimento,
+      status: oficinas.status,
+    })
+    .from(oficinas);
+  return (where ? q.where(where) : q)
+    .orderBy(desc(oficinas.scoreReputacao))
+    .limit(limit);
+}
+
+export async function countByEtapa(
+  filters: Omit<ProspectFilters, "etapas"> = {}
+): Promise<Record<string, number>> {
+  const db = await getDb();
+  if (!db) return {};
+  const where = prospectConditions(filters);
+  const q = db
+    .select({ etapa: oficinas.etapaAtendimento, c: count() })
+    .from(oficinas);
+  const rows = await (where ? q.where(where) : q).groupBy(oficinas.etapaAtendimento);
+  const out: Record<string, number> = {};
+  for (const r of rows) out[String(r.etapa)] = Number(r.c);
+  return out;
+}
+
+export async function addAtendimentoEvento(
+  data: InsertAtendimentoEvento
+): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const r = await db.insert(atendimentoEventos).values(data);
+  return r[0].insertId;
+}
+
+export async function listAtendimentoEventos(
+  oficinaId: number
+): Promise<AtendimentoEvento[]> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(atendimentoEventos)
+    .where(eq(atendimentoEventos.oficinaId, oficinaId))
+    .orderBy(desc(atendimentoEventos.createdAt));
 }

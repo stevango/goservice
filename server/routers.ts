@@ -1,12 +1,12 @@
 import { COOKIE_NAME } from "@shared/const";
-import { SEGMENTO_INFO } from "@shared/types";
+import { SEGMENTO_INFO, ATENDIMENTO_CANAIS, ATENDIMENTO_TIPOS, ATENDIMENTO_ETAPAS, ETAPA_LABEL } from "@shared/types";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import * as db from "./db";
-import type { User } from "../drizzle/schema";
+import type { User, InsertOficina, InsertAtendimentoEvento } from "../drizzle/schema";
 import { hashPassword, verifyPassword } from "./_core/password";
 import { setSessionCookie } from "./_core/session";
 import { ENV } from "./_core/env";
@@ -512,6 +512,98 @@ export const appRouter = router({
       return { total };
     }),
   }),
+
+  // ==================== CENTRO DE CONVERSÃO DE PARCEIROS ====================
+  atendimento: router({
+    kanban: adminProcedure
+      .input(
+        z
+          .object({
+            search: z.string().optional(),
+            cidade: z.string().optional(),
+            estado: z.string().optional(),
+            segmento: z.string().optional(),
+          })
+          .optional()
+      )
+      .query(async ({ input }) => {
+        const filtros = input ?? {};
+        const [itens, counts] = await Promise.all([
+          db.listProspects(filtros, 300),
+          db.countByEtapa(filtros),
+        ]);
+        return { itens, counts };
+      }),
+
+    prospect: adminProcedure
+      .input(z.object({ id: z.number() }))
+      .query(async ({ input }) => {
+        const oficina = await db.getOficinaById(input.id);
+        if (!oficina) throw new TRPCError({ code: "NOT_FOUND" });
+        const eventos = await db.listAtendimentoEventos(input.id);
+        return { oficina, eventos };
+      }),
+
+    registrarContato: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          canal: z.enum(ATENDIMENTO_CANAIS as unknown as [string, ...string[]]),
+          tipo: z.enum(ATENDIMENTO_TIPOS as unknown as [string, ...string[]]),
+          mensagem: z.string().optional(),
+          novaEtapa: z
+            .enum(ATENDIMENTO_ETAPAS as unknown as [string, ...string[]])
+            .optional(),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const oficina = await db.getOficinaById(input.id);
+        if (!oficina) throw new TRPCError({ code: "NOT_FOUND" });
+        const id = await db.addAtendimentoEvento({
+          oficinaId: input.id,
+          autorUserId: ctx.user?.id,
+          canal: input.canal as InsertAtendimentoEventoCanal,
+          tipo: input.tipo as InsertAtendimentoEventoTipo,
+          mensagem: input.mensagem,
+          etapaNova: input.novaEtapa as EventoEtapa | undefined,
+        });
+        if (input.novaEtapa) {
+          await db.updateOficina(input.id, {
+            etapaAtendimento: input.novaEtapa as OficinaEtapa,
+          });
+        }
+        return { id };
+      }),
+
+    mudarEtapa: adminProcedure
+      .input(
+        z.object({
+          id: z.number(),
+          etapa: z.enum(ATENDIMENTO_ETAPAS as unknown as [string, ...string[]]),
+        })
+      )
+      .mutation(async ({ ctx, input }) => {
+        const oficina = await db.getOficinaById(input.id);
+        if (!oficina) throw new TRPCError({ code: "NOT_FOUND" });
+        await db.updateOficina(input.id, {
+          etapaAtendimento: input.etapa as OficinaEtapa,
+        });
+        await db.addAtendimentoEvento({
+          oficinaId: input.id,
+          autorUserId: ctx.user?.id,
+          canal: "outro",
+          tipo: "nota",
+          etapaNova: input.etapa as EventoEtapa,
+          mensagem: `Etapa alterada para "${ETAPA_LABEL[input.etapa as keyof typeof ETAPA_LABEL]}".`,
+        });
+        return { success: true };
+      }),
+  }),
 });
+
+type InsertAtendimentoEventoCanal = InsertAtendimentoEvento["canal"];
+type InsertAtendimentoEventoTipo = InsertAtendimentoEvento["tipo"];
+type EventoEtapa = Exclude<InsertAtendimentoEvento["etapaNova"], null | undefined>;
+type OficinaEtapa = Exclude<InsertOficina["etapaAtendimento"], null | undefined>;
 
 export type AppRouter = typeof appRouter;

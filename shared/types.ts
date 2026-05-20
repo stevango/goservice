@@ -206,3 +206,121 @@ export const FORNECE_PECAS_OPTIONS = [
   { value: "cliente", label: "Cliente fornece" },
   { value: "ambos", label: "Oficina ou Cliente" },
 ] as const;
+
+// ============================================================
+// CENTRO DE CONVERSÃO DE PARCEIROS (Atendimento / CRM)
+// ============================================================
+
+export const ATENDIMENTO_ETAPAS = [
+  "lead_encontrado",
+  "convite_enviado",
+  "convite_entregue",
+  "visualizou",
+  "nao_respondeu",
+  "followup_1",
+  "followup_2",
+  "negociando",
+  "interesse_demonstrado",
+  "cadastro_iniciado",
+  "cadastro_concluido",
+  "ativado",
+  "operando",
+  "recusou",
+  "inativo",
+] as const;
+export type AtendimentoEtapa = (typeof ATENDIMENTO_ETAPAS)[number];
+
+export const ETAPA_LABEL: Record<AtendimentoEtapa, string> = {
+  lead_encontrado: "Lead encontrado",
+  convite_enviado: "Convite enviado",
+  convite_entregue: "Convite entregue",
+  visualizou: "Visualizou",
+  nao_respondeu: "Não respondeu",
+  followup_1: "Follow-up 1",
+  followup_2: "Follow-up 2",
+  negociando: "Negociando",
+  interesse_demonstrado: "Interesse demonstrado",
+  cadastro_iniciado: "Cadastro iniciado",
+  cadastro_concluido: "Cadastro concluído",
+  ativado: "Ativado",
+  operando: "Operando",
+  recusou: "Recusou",
+  inativo: "Inativo",
+};
+
+// Agrupa as 15 etapas em raias visuais do kanban.
+export const ATENDIMENTO_LANES: Array<{
+  id: string;
+  label: string;
+  etapas: AtendimentoEtapa[];
+  cor: string;
+}> = [
+  { id: "descoberta", label: "Descoberta", etapas: ["lead_encontrado"], cor: "border-slate-200 bg-slate-50" },
+  { id: "convite", label: "Convite", etapas: ["convite_enviado", "convite_entregue", "visualizou", "nao_respondeu"], cor: "border-blue-200 bg-blue-50" },
+  { id: "followup", label: "Follow-up", etapas: ["followup_1", "followup_2"], cor: "border-amber-200 bg-amber-50" },
+  { id: "negociacao", label: "Negociação", etapas: ["negociando", "interesse_demonstrado"], cor: "border-purple-200 bg-purple-50" },
+  { id: "ativacao", label: "Ativação", etapas: ["cadastro_iniciado", "cadastro_concluido", "ativado", "operando"], cor: "border-green-200 bg-green-50" },
+  { id: "fora", label: "Fora", etapas: ["recusou", "inativo"], cor: "border-red-200 bg-red-50" },
+];
+
+export function laneDaEtapa(etapa: string | null | undefined): string {
+  if (!etapa) return "descoberta";
+  return ATENDIMENTO_LANES.find(l => (l.etapas as string[]).includes(etapa))?.id ?? "descoberta";
+}
+
+export const ATENDIMENTO_CANAIS = ["email", "whatsapp", "sms", "telefone", "presencial", "outro"] as const;
+export type AtendimentoCanal = (typeof ATENDIMENTO_CANAIS)[number];
+export const CANAL_LABEL: Record<AtendimentoCanal, string> = {
+  email: "E-mail",
+  whatsapp: "WhatsApp",
+  sms: "SMS",
+  telefone: "Ligação",
+  presencial: "Presencial",
+  outro: "Outro",
+};
+
+export const ATENDIMENTO_TIPOS = ["enviado", "entregue", "aberto", "clicado", "respondeu", "aceitou", "recusou", "nota"] as const;
+export type AtendimentoTipo = (typeof ATENDIMENTO_TIPOS)[number];
+export const TIPO_LABEL: Record<AtendimentoTipo, string> = {
+  enviado: "Enviado",
+  entregue: "Entregue",
+  aberto: "Aberto",
+  clicado: "Clicado",
+  respondeu: "Respondeu",
+  aceitou: "Aceitou",
+  recusou: "Recusou",
+  nota: "Nota interna",
+};
+
+// Abertura por grupo de segmento — base pra sugestão automática de copy.
+const ABERTURA_GRUPO: Record<string, string> = {
+  "Automotivo": "Conectamos sua oficina a seguradoras e associações da região, com volume garantido.",
+  "Assistência Veicular 24h": "Sua empresa pode receber acionamentos 24h das nossas seguradoras parceiras.",
+  "Apoio ao Motorista": "Atenda clientes de seguradoras e locadoras quando o veículo ficar parado.",
+  "Assistência Residencial": "Receba chamados de assistência residencial 24h da nossa rede.",
+  "Pet": "Atenda clientes premium com recorrência através da nossa rede de seguros pet.",
+  "Energia Solar": "Receba leads qualificados da nossa rede em todo o Brasil.",
+  "Veículos — Lojas e Agências": "Ofereça opções de venda e carro reserva para nossa base de clientes.",
+};
+
+export function sugerirMensagem(input: {
+  nomeFantasia: string;
+  segmento: string | null | undefined;
+  cidade: string | null | undefined;
+  estado: string | null | undefined;
+  canal: AtendimentoCanal;
+}): string {
+  const grupo = (input.segmento && SEGMENTO_INFO[input.segmento]?.grupo) || "Automotivo";
+  const abertura = ABERTURA_GRUPO[grupo] ?? ABERTURA_GRUPO["Automotivo"];
+  const local = [input.cidade, input.estado].filter(Boolean).join("/");
+  if (input.canal === "whatsapp") {
+    return `Olá, equipe da ${input.nomeFantasia}! Aqui é da GO SERVICE. ${abertura} Posso enviar mais detalhes sobre como credenciar ${local ? `a sua unidade em ${local}` : "sua unidade"} sem custo?`;
+  }
+  if (input.canal === "sms") {
+    return `GO SERVICE: ${abertura} Responda SIM para receber os detalhes do credenciamento.`;
+  }
+  if (input.canal === "email") {
+    return `Olá, ${input.nomeFantasia},\n\n${abertura}\n\nA GO SERVICE é a maior rede multissegmento de prestadores credenciados do Brasil. Conectamos seguradoras, associações e clientes finais à melhor estrutura local${local ? ` em ${local}` : ""}.\n\nPosso agendar uma conversa rápida (15 min) para apresentar a oportunidade?\n\nAtt,\nEquipe GO SERVICE`;
+  }
+  return `${abertura} Vamos conversar sobre o credenciamento da ${input.nomeFantasia}${local ? ` em ${local}` : ""}.`;
+}

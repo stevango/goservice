@@ -92,7 +92,26 @@ export const oficinas = mysqlTable("oficinas", {
   
   // Observações internas (admin)
   observacoesAdmin: text("observacoesAdmin"),
-  
+
+  // Etapa atual no funil de conversão de parceiros (centro de conversão).
+  etapaAtendimento: mysqlEnum("etapaAtendimento", [
+    "lead_encontrado",
+    "convite_enviado",
+    "convite_entregue",
+    "visualizou",
+    "nao_respondeu",
+    "followup_1",
+    "followup_2",
+    "negociando",
+    "interesse_demonstrado",
+    "cadastro_iniciado",
+    "cadastro_concluido",
+    "ativado",
+    "operando",
+    "recusou",
+    "inativo",
+  ]).default("lead_encontrado").notNull(),
+
   // Dedup de importação automática (Google Places)
   googlePlaceId: varchar("googlePlaceId", { length: 128 }),
 
@@ -258,3 +277,55 @@ export const importJobs = mysqlTable("import_jobs", {
 
 export type ImportJob = typeof importJobs.$inferSelect;
 export type InsertImportJob = typeof importJobs.$inferInsert;
+
+/**
+ * Linha do tempo do centro de conversão: cada toque com o prospect
+ * (e-mail enviado, ligação, anotação, mudança de etapa, etc.).
+ */
+export const atendimentoEventos = mysqlTable("atendimento_eventos", {
+  id: int("id").autoincrement().primaryKey(),
+  oficinaId: int("oficinaId").notNull(),
+  autorUserId: int("autorUserId"),
+  canal: mysqlEnum("canal", [
+    "email",
+    "whatsapp",
+    "sms",
+    "telefone",
+    "presencial",
+    "outro",
+  ]).notNull(),
+  tipo: mysqlEnum("tipo", [
+    "enviado",
+    "entregue",
+    "aberto",
+    "clicado",
+    "respondeu",
+    "aceitou",
+    "recusou",
+    "nota",
+  ]).notNull(),
+  etapaNova: mysqlEnum("etapaNova", [
+    "lead_encontrado",
+    "convite_enviado",
+    "convite_entregue",
+    "visualizou",
+    "nao_respondeu",
+    "followup_1",
+    "followup_2",
+    "negociando",
+    "interesse_demonstrado",
+    "cadastro_iniciado",
+    "cadastro_concluido",
+    "ativado",
+    "operando",
+    "recusou",
+    "inativo",
+  ]),
+  mensagem: text("mensagem"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  oficinaIdx: index("atendimento_eventos_oficina_idx").on(t.oficinaId),
+}));
+
+export type AtendimentoEvento = typeof atendimentoEventos.$inferSelect;
+export type InsertAtendimentoEvento = typeof atendimentoEventos.$inferInsert;
