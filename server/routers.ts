@@ -129,7 +129,8 @@ export const appRouter = router({
   oficinas: router({
     // Public: busca de oficinas ativas
     buscar: publicProcedure.input(z.object({
-      categoria: z.string().optional(),
+      segmento: z.string().optional(),
+      grupo: z.string().optional(),
       cidade: z.string().optional(),
       estado: z.string().optional(),
       tipoVeiculo: z.string().optional(),
@@ -138,7 +139,13 @@ export const appRouter = router({
       limit: z.number().optional(),
       offset: z.number().optional(),
     }).optional()).query(async ({ input }) => {
-      return db.listOficinasPublic(input || {});
+      const segmentos = input?.grupo
+        ? Object.entries(SEGMENTO_INFO)
+            .filter(([, v]) => v.grupo === input.grupo)
+            .map(([k]) => k)
+        : undefined;
+      const { grupo: _grupo, ...rest } = input ?? {};
+      return db.listOficinasPublic({ ...rest, segmentos });
     }),
 
     // Public: detalhes de uma oficina ativa

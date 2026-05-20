@@ -156,7 +156,7 @@ export default function Home() {
               return (
                 <Link
                   key={g.grupo}
-                  href="/buscar"
+                  href={`/buscar?grupo=${encodeURIComponent(g.grupo)}`}
                   className="flex flex-col items-center text-center p-5 rounded-xl border border-border/60 bg-card hover:shadow-md hover:border-primary/20 transition-all"
                 >
                   <Icon className="w-8 h-8 text-primary mb-3" />

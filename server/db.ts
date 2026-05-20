@@ -137,6 +137,7 @@ export async function listOficinas(filters?: {
   status?: string;
   categoria?: string;
   segmento?: string;
+  segmentos?: string[];
   cidade?: string;
   estado?: string;
   tipoVeiculo?: string;
@@ -153,6 +154,9 @@ export async function listOficinas(filters?: {
   if (filters?.status) conditions.push(eq(oficinas.status, filters.status as any));
   if (filters?.categoria) conditions.push(eq(oficinas.categoria, filters.categoria as any));
   if (filters?.segmento) conditions.push(eq(oficinas.segmento, filters.segmento));
+  if (filters?.segmentos && filters.segmentos.length > 0) {
+    conditions.push(inArray(oficinas.segmento, filters.segmentos));
+  }
   if (filters?.cidade) conditions.push(like(oficinas.cidade, `%${filters.cidade}%`));
   if (filters?.estado) conditions.push(eq(oficinas.estado, filters.estado));
   if (filters?.search) {
@@ -188,6 +192,7 @@ export async function listOficinas(filters?: {
 export async function listOficinasPublic(filters?: {
   categoria?: string;
   segmento?: string;
+  segmentos?: string[];
   cidade?: string;
   estado?: string;
   tipoVeiculo?: string;
