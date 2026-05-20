@@ -2,9 +2,20 @@ import PublicLayout from "@/components/PublicLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Link } from "wouter";
-import { Search, MapPin, Shield, Star, Building2, Truck, Bike, Car, ArrowRight, CheckCircle2 } from "lucide-react";
+import { Search, MapPin, Shield, Star, Building2, Wrench, LifeBuoy, Home as HomeIcon, PawPrint, Sun, Car, ArrowRight, CheckCircle2, Headphones } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "wouter";
+import { SEGMENTOS } from "@shared/types";
+
+const GRUPO_ICON: Record<string, typeof Wrench> = {
+  "Automotivo": Wrench,
+  "Assistência Veicular 24h": LifeBuoy,
+  "Apoio ao Motorista": Headphones,
+  "Assistência Residencial": HomeIcon,
+  "Pet": PawPrint,
+  "Energia Solar": Sun,
+  "Veículos — Lojas e Agências": Car,
+};
 
 export default function Home() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -35,13 +46,15 @@ export default function Home() {
             </div>
             
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight text-foreground leading-[1.1] mb-6">
-              Encontre a oficina ideal{" "}
-              <span className="text-primary">mais próxima</span> de você
+              Encontre o serviço ideal{" "}
+              <span className="text-primary">mais próximo</span> de você
             </h1>
-            
+
             <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mb-10 leading-relaxed">
-              A maior rede de oficinas credenciadas do Brasil. Classificadas por especialidade, 
-              tipo de veículo e reputação — para seguradoras, associações e clientes finais.
+              A maior rede multisegmento de prestadores credenciados do Brasil —
+              oficinas, assistência veicular 24h, residencial, pet, energia solar e mais.
+              Classificados por segmento, cidade e reputação, para seguradoras, associações
+              e clientes finais.
             </p>
 
             {/* Search Bar */}
@@ -69,7 +82,7 @@ export default function Home() {
         <div className="container py-10">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {[
-              { value: "5.000+", label: "Oficinas Credenciadas" },
+              { value: "5.000+", label: "Prestadores Credenciados" },
               { value: "27", label: "Estados Cobertos" },
               { value: "4.8", label: "Avaliação Média" },
               { value: "150+", label: "Seguradoras Parceiras" },
@@ -88,10 +101,10 @@ export default function Home() {
         <div className="container">
           <div className="text-center max-w-2xl mx-auto mb-16">
             <h2 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
-              Por que usar a Rede Oficinas?
+              Por que usar a GO SERVICE?
             </h2>
             <p className="text-muted-foreground text-lg">
-              Resolvemos o gargalo logístico entre seguradoras e oficinas no interior do Brasil.
+              Resolvemos o gargalo logístico entre seguradoras e prestadores no interior do Brasil — em todos os segmentos.
             </p>
           </div>
 
@@ -100,12 +113,12 @@ export default function Home() {
               {
                 icon: MapPin,
                 title: "Geolocalização Inteligente",
-                description: "Encontre a oficina credenciada mais próxima do sinistro, evitando deslocamentos desnecessários.",
+                description: "Encontre o prestador credenciado mais próximo do atendimento, evitando deslocamentos desnecessários.",
               },
               {
                 icon: Shield,
-                title: "Classificação por Estrutura",
-                description: "Oficinas categorizadas como Premium, Concessionária ou Padrão — com detalhes de serviços e veículos atendidos.",
+                title: "Organizado por Segmento",
+                description: "Prestadores em 7 grupos: automotivo, assistência 24h, apoio ao motorista, residencial, pet, energia solar e lojas de veículos.",
               },
               {
                 icon: Star,
@@ -128,29 +141,32 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Vehicle Types */}
+      {/* Service Groups */}
       <section className="py-16 bg-muted/20 border-y border-border/50">
         <div className="container">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-center mb-12">
-            Todos os tipos de veículos
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-center mb-3">
+            Tudo o que você precisa, num lugar só
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            {[
-              { icon: Car, label: "Leves", desc: "Carros e sedãs" },
-              { icon: Truck, label: "Pesados", desc: "Caminhões e ônibus" },
-              { icon: Bike, label: "Motos", desc: "Motocicletas" },
-              { icon: Truck, label: "Vans", desc: "Utilitários" },
-              { icon: Building2, label: "Náuticos", desc: "Embarcações" },
-            ].map((type) => (
-              <div
-                key={type.label}
-                className="flex flex-col items-center p-5 rounded-xl border border-border/60 bg-card hover:shadow-md hover:border-primary/20 transition-all cursor-pointer"
-              >
-                <type.icon className="w-8 h-8 text-primary mb-3" />
-                <span className="font-medium text-sm">{type.label}</span>
-                <span className="text-xs text-muted-foreground">{type.desc}</span>
-              </div>
-            ))}
+          <p className="text-center text-muted-foreground mb-10 max-w-2xl mx-auto">
+            Sete grupos de serviços com prestadores avaliados e geolocalizados.
+          </p>
+          <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+            {SEGMENTOS.map(g => {
+              const Icon = GRUPO_ICON[g.grupo] ?? Wrench;
+              return (
+                <Link
+                  key={g.grupo}
+                  href="/buscar"
+                  className="flex flex-col items-center text-center p-5 rounded-xl border border-border/60 bg-card hover:shadow-md hover:border-primary/20 transition-all"
+                >
+                  <Icon className="w-8 h-8 text-primary mb-3" />
+                  <span className="font-medium text-sm">{g.grupo}</span>
+                  <span className="text-xs text-muted-foreground mt-1">
+                    {g.itens.length} segmento{g.itens.length > 1 ? "s" : ""}
+                  </span>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -167,15 +183,16 @@ export default function Home() {
                 Acesse a rede completa para seus segurados
               </h2>
               <p className="text-muted-foreground text-lg mb-8 leading-relaxed">
-                Ofereça uma logística melhor para seus clientes. Direcione veículos para oficinas 
-                referenciadas mais próximas, com informações completas sobre estrutura, serviços e reputação.
+                Ofereça uma logística melhor para seus clientes. Direcione cada
+                atendimento para o prestador credenciado mais próximo, com
+                informações completas sobre estrutura, serviços e reputação.
               </p>
               <div className="space-y-3 mb-8">
                 {[
-                  "Filtros avançados por região, categoria e especialidade",
-                  "Dados completos: franquia, parcelamento, peças",
+                  "Filtros avançados por região, segmento e especialidade",
+                  "Dados completos: franquia, parcelamento, peças (quando se aplica)",
                   "Exportação de dados para integração com seus sistemas",
-                  "Score de reputação verificado",
+                  "Score de reputação verificado (Google + avaliações internas)",
                 ].map((item) => (
                   <div key={item} className="flex items-start gap-3">
                     <CheckCircle2 className="w-5 h-5 text-primary mt-0.5 flex-shrink-0" />
@@ -202,18 +219,18 @@ export default function Home() {
         </div>
       </section>
 
-      {/* CTA for Oficinas */}
+      {/* CTA prestadores */}
       <section className="py-16 bg-primary text-white">
         <div className="container text-center">
           <h2 className="text-2xl md:text-3xl font-bold mb-4">
-            É dono de oficina? Faça parte da rede.
+            Tem um negócio? Faça parte da GO SERVICE.
           </h2>
           <p className="text-white/80 max-w-lg mx-auto mb-8">
-            Cadastre sua oficina gratuitamente e receba clientes de seguradoras e associações de todo o Brasil.
+            Cadastre seu negócio gratuitamente e receba clientes de seguradoras e associações de todo o Brasil.
           </p>
           <Button asChild size="lg" variant="secondary" className="rounded-xl">
             <Link href="/cadastro">
-              Cadastrar Minha Oficina
+              Cadastrar meu Negócio
               <ArrowRight className="w-4 h-4 ml-2" />
             </Link>
           </Button>

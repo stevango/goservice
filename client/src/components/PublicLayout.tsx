@@ -19,8 +19,8 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
 
   const navLinks = [
     { href: "/", label: "Início" },
-    { href: "/buscar", label: "Buscar Oficinas" },
-    { href: "/cadastro", label: "Credenciar Oficina" },
+    { href: "/buscar", label: "Buscar Serviços" },
+    { href: "/cadastro", label: "Seja um Prestador" },
   ];
 
   return (
@@ -33,7 +33,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
               <Building2 className="w-5 h-5 text-white" />
             </div>
             <span className="font-bold text-lg tracking-tight text-foreground">
-              Rede Oficinas
+              GO SERVICE
             </span>
           </Link>
 
@@ -85,7 +85,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                   <Link href="/minha-oficina">
                     <DropdownMenuItem className="cursor-pointer">
                       <Building2 className="w-4 h-4 mr-2" />
-                      Minha Oficina
+                      Meu Cadastro
                     </DropdownMenuItem>
                   </Link>
                   <DropdownMenuSeparator />
@@ -150,18 +150,20 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
                 <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
                   <Building2 className="w-4 h-4 text-white" />
                 </div>
-                <span className="font-bold text-lg">Rede Oficinas Brasil</span>
+                <span className="font-bold text-lg">GO SERVICE</span>
               </div>
               <p className="text-sm text-muted-foreground max-w-md leading-relaxed">
-                A maior rede de oficinas credenciadas do Brasil. Conectamos seguradoras, 
-                associações e clientes às melhores oficinas do país com geolocalização inteligente.
+                A maior rede multisegmento de prestadores credenciados do Brasil.
+                Conectamos seguradoras, associações e clientes a oficinas, assistência
+                veicular 24h, residencial, pet, energia solar e mais — com
+                geolocalização inteligente.
               </p>
             </div>
             <div>
               <h4 className="font-semibold text-sm mb-3">Plataforma</h4>
               <div className="flex flex-col gap-2">
-                <Link href="/buscar" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Buscar Oficinas</Link>
-                <Link href="/cadastro" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Credenciar Oficina</Link>
+                <Link href="/buscar" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Buscar Serviços</Link>
+                <Link href="/cadastro" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Seja um Prestador</Link>
                 <Link href="/b2b" className="text-sm text-muted-foreground hover:text-foreground transition-colors">Área B2B</Link>
               </div>
             </div>
@@ -176,7 +178,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
           </div>
           <div className="border-t border-border/50 mt-8 pt-6">
             <p className="text-xs text-muted-foreground text-center">
-              © {new Date().getFullYear()} Rede Oficinas Brasil. Todos os direitos reservados.
+              © {new Date().getFullYear()} GO SERVICE. Todos os direitos reservados.
             </p>
           </div>
         </div>
