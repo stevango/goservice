@@ -1,6 +1,5 @@
 import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -30,6 +29,8 @@ import {
   ExternalLink,
   Mail,
   MessageCircle,
+  StickyNote,
+  Check,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
@@ -47,6 +48,10 @@ import {
   TIPO_LABEL,
   laneDaEtapa,
   sugerirMensagem,
+  assuntoEmail,
+  linkWhatsApp,
+  linkTelefone,
+  linkEmail,
   type AtendimentoCanal,
   type AtendimentoTipo,
   type AtendimentoEtapa,
@@ -282,7 +287,7 @@ function ProspectDialog({
     onError: e => toast.error(e.message),
   });
 
-  const [canal, setCanal] = useState<AtendimentoCanal>("email");
+  const [canal, setCanal] = useState<AtendimentoCanal>("whatsapp");
   const [tipo, setTipo] = useState<AtendimentoTipo>("enviado");
   const [novaEtapa, setNovaEtapa] = useState<string>("");
   const [mensagem, setMensagem] = useState("");
@@ -298,7 +303,8 @@ function ProspectDialog({
         segmento: oficina.segmento,
         cidade: oficina.cidade,
         estado: oficina.estado,
-        canal,
+        canal:
+          canal === "telefone" || canal === "presencial" ? "whatsapp" : canal,
       })
     );
   };
@@ -316,80 +322,97 @@ function ProspectDialog({
     setNovaEtapa("");
   };
 
+  const inicial = (oficina?.nomeFantasia?.trim()?.[0] ?? "?").toUpperCase();
+  const funnelLanes = ATENDIMENTO_LANES.filter(l => l.id !== "fora");
+  const currentLaneId = oficina
+    ? laneDaEtapa(oficina.etapaAtendimento)
+    : "descoberta";
+  const foraDoFunil = currentLaneId === "fora";
+  const currentIndex = funnelLanes.findIndex(l => l.id === currentLaneId);
+
+  const waMsg = oficina
+    ? sugerirMensagem({
+        nomeFantasia: oficina.nomeFantasia,
+        segmento: oficina.segmento,
+        cidade: oficina.cidade,
+        estado: oficina.estado,
+        canal: "whatsapp",
+      })
+    : "";
+  const emailMsg = oficina
+    ? sugerirMensagem({
+        nomeFantasia: oficina.nomeFantasia,
+        segmento: oficina.segmento,
+        cidade: oficina.cidade,
+        estado: oficina.estado,
+        canal: "email",
+      })
+    : "";
+  const waHref = oficina
+    ? linkWhatsApp(oficina.whatsapp ?? oficina.telefone, waMsg)
+    : null;
+  const telHref = oficina
+    ? linkTelefone(oficina.telefone ?? oficina.whatsapp)
+    : null;
+  const emailHref = oficina
+    ? linkEmail(oficina.email, assuntoEmail(oficina.nomeFantasia), emailMsg)
+    : null;
+
   return (
     <Dialog open={!!id} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
         {q.isLoading || !oficina ? (
-          <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin" />
+          <div className="flex justify-center py-16">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
         ) : (
           <>
-            <DialogHeader>
-              <DialogTitle className="text-xl">
-                {oficina.nomeFantasia}
-              </DialogTitle>
-              <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                <Badge variant="secondary">
-                  {segmentoLabel(oficina.segmento)}
-                </Badge>
-                <span>
-                  {oficina.cidade}/{oficina.estado}
-                </span>
-                <span className="inline-flex items-center gap-1">
-                  <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                  {Number(oficina.scoreReputacao ?? 0).toFixed(1)} (
-                  {oficina.totalAvaliacoes ?? 0} avaliações)
-                </span>
-                <Link
-                  href={`/admin/oficinas/${oficina.id}`}
-                  className="text-blue-600 hover:underline inline-flex items-center gap-1"
+            {/* Cabeçalho */}
+            <DialogHeader className="space-y-0 px-6 pt-6 pb-5 border-b bg-muted/30">
+              <div className="flex items-start gap-4 pr-8">
+                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0">
+                  {inicial}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <DialogTitle className="text-xl leading-tight truncate">
+                    {oficina.nomeFantasia}
+                  </DialogTitle>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-muted-foreground">
+                    <Badge variant="secondary" className="font-normal">
+                      {segmentoLabel(oficina.segmento)}
+                    </Badge>
+                    <span className="inline-flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5" />
+                      {oficina.cidade}/{oficina.estado}
+                    </span>
+                    <span className="inline-flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      {Number(oficina.scoreReputacao ?? 0).toFixed(1)}
+                      <span className="text-muted-foreground/70">
+                        · {oficina.totalAvaliacoes ?? 0} avaliações
+                      </span>
+                    </span>
+                  </div>
+                </div>
+                <Button
+                  asChild
+                  variant="outline"
+                  size="sm"
+                  className="shrink-0 gap-1.5"
                 >
-                  Ficha completa <ExternalLink className="w-3 h-3" />
-                </Link>
+                  <Link href={`/admin/oficinas/${oficina.id}`}>
+                    Ver ficha
+                    <ExternalLink className="w-3.5 h-3.5" />
+                  </Link>
+                </Button>
               </div>
             </DialogHeader>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-              <Card className="p-4">
-                <h3 className="font-semibold text-sm mb-3">Contato</h3>
-                <div className="space-y-1.5 text-sm">
-                  <ContatoLinha
-                    icon={<Phone className="w-3.5 h-3.5" />}
-                    valor={oficina.telefone}
-                    href={
-                      oficina.telefone ? `tel:${oficina.telefone}` : undefined
-                    }
-                  />
-                  <ContatoLinha
-                    icon={
-                      <MessageCircle className="w-3.5 h-3.5 text-green-600" />
-                    }
-                    valor={oficina.whatsapp}
-                    href={
-                      oficina.whatsapp
-                        ? `https://wa.me/${oficina.whatsapp.replace(/\D/g, "")}`
-                        : undefined
-                    }
-                  />
-                  <ContatoLinha
-                    icon={<Mail className="w-3.5 h-3.5" />}
-                    valor={oficina.email}
-                    href={oficina.email ? `mailto:${oficina.email}` : undefined}
-                  />
-                </div>
-              </Card>
-
-              <Card className="p-4">
-                <h3 className="font-semibold text-sm mb-3">Etapa no funil</h3>
-                <div className="flex items-center gap-2">
-                  <Badge className="bg-primary/10 text-primary border-0">
-                    {ETAPA_LABEL[
-                      oficina.etapaAtendimento as AtendimentoEtapa
-                    ] ?? oficina.etapaAtendimento}
-                  </Badge>
-                </div>
-                <div className="mt-3">
+            <div className="px-6 py-5 space-y-6">
+              {/* Posição no funil */}
+              <section>
+                <div className="flex items-center justify-between mb-3">
+                  <SectionLabel>Posição no funil</SectionLabel>
                   <Select
                     value=""
                     onValueChange={v =>
@@ -397,8 +420,8 @@ function ProspectDialog({
                       mudarEtapa.mutate({ id, etapa: v as AtendimentoEtapa })
                     }
                   >
-                    <SelectTrigger className="text-sm">
-                      <SelectValue placeholder="Mudar etapa..." />
+                    <SelectTrigger className="h-8 w-auto gap-1.5 text-xs">
+                      <SelectValue placeholder="Mover etapa" />
                     </SelectTrigger>
                     <SelectContent>
                       {ATENDIMENTO_ETAPAS.map(et => (
@@ -409,135 +432,238 @@ function ProspectDialog({
                     </SelectContent>
                   </Select>
                 </div>
-              </Card>
-            </div>
 
-            <Card className="p-4 mt-4">
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="font-semibold text-sm">Registrar contato</h3>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-xs gap-1"
-                  onClick={aplicarSugestao}
-                >
-                  <Sparkles className="w-3.5 h-3.5" /> Sugerir mensagem
-                </Button>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                <Select
-                  value={canal}
-                  onValueChange={v => setCanal(v as AtendimentoCanal)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ATENDIMENTO_CANAIS.map(c => (
-                      <SelectItem key={c} value={c}>
-                        {CANAL_LABEL[c]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={tipo}
-                  onValueChange={v => setTipo(v as AtendimentoTipo)}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ATENDIMENTO_TIPOS.map(t => (
-                      <SelectItem key={t} value={t}>
-                        {TIPO_LABEL[t]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Select
-                  value={novaEtapa || NENHUMA}
-                  onValueChange={v => setNovaEtapa(v === NENHUMA ? "" : v)}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Mudar etapa (opcional)" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NENHUMA}>Sem mudar etapa</SelectItem>
-                    {ATENDIMENTO_ETAPAS.map(et => (
-                      <SelectItem key={et} value={et}>
-                        {ETAPA_LABEL[et]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Textarea
-                rows={5}
-                value={mensagem}
-                onChange={e => setMensagem(e.target.value)}
-                placeholder="Cole ou escreva a mensagem enviada / o resumo do contato..."
-              />
-              <div className="flex justify-end mt-3">
-                <Button
-                  onClick={enviar}
-                  disabled={registrar.isPending}
-                  className="gap-2"
-                >
-                  {registrar.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
-                  ) : (
-                    <Send className="w-4 h-4" />
-                  )}
-                  Registrar
-                </Button>
-              </div>
-            </Card>
+                {foraDoFunil ? (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between">
+                    <span className="text-sm font-medium text-red-700">
+                      Fora do funil
+                    </span>
+                    <Badge className="bg-red-100 text-red-700 border-0">
+                      {ETAPA_LABEL[
+                        oficina.etapaAtendimento as AtendimentoEtapa
+                      ] ?? oficina.etapaAtendimento}
+                    </Badge>
+                  </div>
+                ) : (
+                  <div className="flex items-stretch gap-1.5">
+                    {funnelLanes.map((lane, i) => {
+                      const done = i < currentIndex;
+                      const atual = i === currentIndex;
+                      return (
+                        <div key={lane.id} className="flex-1 min-w-0">
+                          <div
+                            className={`h-1.5 rounded-full transition-colors ${
+                              done || atual ? "bg-primary" : "bg-muted"
+                            }`}
+                          />
+                          <div
+                            className={`mt-1.5 flex items-center gap-1 text-[11px] truncate ${
+                              atual
+                                ? "font-semibold text-foreground"
+                                : "text-muted-foreground"
+                            }`}
+                          >
+                            {done && (
+                              <Check className="w-3 h-3 text-primary shrink-0" />
+                            )}
+                            <span className="truncate">{lane.label}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+                {!foraDoFunil && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Etapa atual:{" "}
+                    <span className="font-medium text-foreground">
+                      {ETAPA_LABEL[
+                        oficina.etapaAtendimento as AtendimentoEtapa
+                      ] ?? oficina.etapaAtendimento}
+                    </span>
+                  </p>
+                )}
+              </section>
 
-            <Card className="p-4 mt-4">
-              <h3 className="font-semibold text-sm mb-3">
-                Histórico ({eventos.length})
-              </h3>
-              {eventos.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-4 text-center">
-                  Nenhum contato registrado ainda.
+              {/* Falar agora */}
+              <section>
+                <SectionLabel className="mb-3">
+                  Falar com o prospect
+                </SectionLabel>
+                <div className="grid grid-cols-3 gap-2">
+                  <AcaoCanal
+                    href={waHref}
+                    onClick={() => setCanal("whatsapp")}
+                    icon={<MessageCircle className="w-4 h-4" />}
+                    label="WhatsApp"
+                    className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                  />
+                  <AcaoCanal
+                    href={telHref}
+                    onClick={() => setCanal("telefone")}
+                    icon={<Phone className="w-4 h-4" />}
+                    label="Ligar"
+                    className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                  />
+                  <AcaoCanal
+                    href={emailHref}
+                    onClick={() => setCanal("email")}
+                    icon={<Mail className="w-4 h-4" />}
+                    label="E-mail"
+                    className="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                  />
+                </div>
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  Abre o canal com a mensagem sugerida já preenchida. Depois,
+                  registre o contato abaixo.
                 </p>
-              ) : (
-                <ul className="space-y-3">
-                  {eventos.map(ev => (
-                    <li
-                      key={ev.id}
-                      className="border-l-2 border-primary/30 pl-3"
+              </section>
+
+              {/* Registrar contato */}
+              <section className="rounded-xl border bg-card p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <SectionLabel>Registrar contato</SectionLabel>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 text-xs gap-1"
+                    onClick={aplicarSugestao}
+                  >
+                    <Sparkles className="w-3.5 h-3.5" /> Sugerir mensagem
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                  <CampoSelect label="Canal">
+                    <Select
+                      value={canal}
+                      onValueChange={v => setCanal(v as AtendimentoCanal)}
                     >
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                        <span>
-                          {new Date(ev.createdAt).toLocaleString("pt-BR")}
-                        </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {CANAL_LABEL[ev.canal as AtendimentoCanal] ??
-                            ev.canal}
-                        </Badge>
-                        <Badge variant="secondary" className="text-[10px]">
-                          {TIPO_LABEL[ev.tipo as AtendimentoTipo] ?? ev.tipo}
-                        </Badge>
-                        {ev.etapaNova && (
-                          <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
-                            →{" "}
-                            {ETAPA_LABEL[ev.etapaNova as AtendimentoEtapa] ??
-                              ev.etapaNova}
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATENDIMENTO_CANAIS.map(c => (
+                          <SelectItem key={c} value={c}>
+                            {CANAL_LABEL[c]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CampoSelect>
+                  <CampoSelect label="Resultado">
+                    <Select
+                      value={tipo}
+                      onValueChange={v => setTipo(v as AtendimentoTipo)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {ATENDIMENTO_TIPOS.map(t => (
+                          <SelectItem key={t} value={t}>
+                            {TIPO_LABEL[t]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CampoSelect>
+                  <CampoSelect label="Mover para">
+                    <Select
+                      value={novaEtapa || NENHUMA}
+                      onValueChange={v => setNovaEtapa(v === NENHUMA ? "" : v)}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Mover etapa" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={NENHUMA}>Manter etapa</SelectItem>
+                        {ATENDIMENTO_ETAPAS.map(et => (
+                          <SelectItem key={et} value={et}>
+                            {ETAPA_LABEL[et]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </CampoSelect>
+                </div>
+                <Textarea
+                  rows={4}
+                  value={mensagem}
+                  onChange={e => setMensagem(e.target.value)}
+                  placeholder="Cole a mensagem enviada ou anote o resumo do contato..."
+                />
+                <div className="flex justify-end mt-3">
+                  <Button
+                    onClick={enviar}
+                    disabled={registrar.isPending}
+                    className="gap-2"
+                  >
+                    {registrar.isPending ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Send className="w-4 h-4" />
+                    )}
+                    Registrar contato
+                  </Button>
+                </div>
+              </section>
+
+              {/* Linha do tempo */}
+              <section>
+                <SectionLabel className="mb-3">
+                  Linha do tempo ({eventos.length})
+                </SectionLabel>
+                {eventos.length === 0 ? (
+                  <div className="rounded-xl border border-dashed py-8 text-center">
+                    <StickyNote className="w-6 h-6 mx-auto text-muted-foreground/50 mb-2" />
+                    <p className="text-sm text-muted-foreground">
+                      Nenhum contato registrado ainda.
+                    </p>
+                    <p className="text-xs text-muted-foreground/70 mt-0.5">
+                      Use os botões acima para iniciar a conversa.
+                    </p>
+                  </div>
+                ) : (
+                  <ol className="relative space-y-4 pl-6 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-border">
+                    {eventos.map(ev => (
+                      <li key={ev.id} className="relative">
+                        <span className="absolute -left-[22px] top-1 w-3.5 h-3.5 rounded-full bg-background border-2 border-primary" />
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline" className="text-[10px]">
+                            {CANAL_LABEL[ev.canal as AtendimentoCanal] ??
+                              ev.canal}
                           </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
+                            {TIPO_LABEL[ev.tipo as AtendimentoTipo] ?? ev.tipo}
+                          </Badge>
+                          {ev.etapaNova && (
+                            <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
+                              →{" "}
+                              {ETAPA_LABEL[ev.etapaNova as AtendimentoEtapa] ??
+                                ev.etapaNova}
+                            </Badge>
+                          )}
+                          <span className="text-[11px] text-muted-foreground ml-auto">
+                            {new Date(ev.createdAt).toLocaleString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                              year: "numeric",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        {ev.mensagem && (
+                          <p className="text-sm mt-1.5 whitespace-pre-wrap text-foreground/90">
+                            {ev.mensagem}
+                          </p>
                         )}
-                      </div>
-                      {ev.mensagem && (
-                        <p className="text-sm mt-1 whitespace-pre-wrap">
-                          {ev.mensagem}
-                        </p>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </section>
+            </div>
           </>
         )}
       </DialogContent>
@@ -545,32 +671,68 @@ function ProspectDialog({
   );
 }
 
-function ContatoLinha({
-  icon,
-  valor,
-  href,
+function SectionLabel({
+  children,
+  className = "",
 }: {
-  icon: React.ReactNode;
-  valor: string | null | undefined;
-  href?: string;
+  children: React.ReactNode;
+  className?: string;
 }) {
-  if (!valor) return null;
-  const inner = (
-    <span className="inline-flex items-center gap-2">
-      {icon}
-      {valor}
-    </span>
+  return (
+    <h3
+      className={`text-xs font-semibold uppercase tracking-wide text-muted-foreground ${className}`}
+    >
+      {children}
+    </h3>
   );
-  return href ? (
+}
+
+function CampoSelect({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[11px] text-muted-foreground">{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function AcaoCanal({
+  href,
+  onClick,
+  icon,
+  label,
+  className,
+}: {
+  href: string | null;
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+  className: string;
+}) {
+  if (!href) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-1 rounded-lg border border-dashed py-3 text-muted-foreground/50 cursor-not-allowed">
+        {icon}
+        <span className="text-xs font-medium">{label}</span>
+      </div>
+    );
+  }
+  return (
     <a
       href={href}
       target="_blank"
       rel="noopener noreferrer"
-      className="text-blue-600 hover:underline block"
+      onClick={onClick}
+      className={`flex flex-col items-center justify-center gap-1 rounded-lg border py-3 font-medium transition-colors ${className}`}
     >
-      {inner}
+      {icon}
+      <span className="text-xs">{label}</span>
     </a>
-  ) : (
-    <span className="block">{inner}</span>
   );
 }
