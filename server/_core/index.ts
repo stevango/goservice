@@ -14,6 +14,7 @@ import { serveStatic, setupVite } from "./vite";
 import { isFieldEncryptionConfigured } from "./crypto";
 import { runMigrations } from "./migrate";
 import { startImportWorker } from "./oficinaImport";
+import { startAutomacaoWorker } from "./atendimentoAutomacao";
 
 // Falha cedo se o segredo de sessão for ausente/fraco: com segredo fraco
 // qualquer pessoa forja o cookie de sessão (inclusive admin).
@@ -49,7 +50,11 @@ function assertFieldEncryption() {
 // sem Origin (server-to-server/cron) passam — CSRF exige um navegador,
 // que sempre envia Origin em POST cross-site.
 function csrfGuard(req: Request, res: Response, next: NextFunction) {
-  if (req.method === "GET" || req.method === "HEAD" || req.method === "OPTIONS") {
+  if (
+    req.method === "GET" ||
+    req.method === "HEAD" ||
+    req.method === "OPTIONS"
+  ) {
     return next();
   }
   const origin = req.headers.origin;
@@ -72,6 +77,7 @@ async function startServer() {
 
   await runMigrations();
   startImportWorker();
+  startAutomacaoWorker();
 
   const app = express();
   const server = createServer(app);

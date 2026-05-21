@@ -33,6 +33,9 @@ import {
   Check,
   ChevronLeft,
   Eye,
+  Zap,
+  ArrowRight,
+  Link2 as LinkIcon,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
@@ -54,10 +57,12 @@ import {
   linkWhatsApp,
   linkTelefone,
   linkEmail,
+  proximaEtapaEsteira,
   type AtendimentoCanal,
   type AtendimentoTipo,
   type AtendimentoEtapa,
 } from "@shared/types";
+import { Switch } from "@/components/ui/switch";
 
 // Radix Select não aceita value="" em SelectItem. Usamos sentinelas
 // e convertemos para string vazia (= "sem filtro") ao mudar.
@@ -76,6 +81,7 @@ type Prospect = {
   scoreReputacao: string | null;
   totalAvaliacoes: number | null;
   etapaAtendimento: string;
+  automacaoAtiva?: boolean;
 };
 
 export default function AdminAtendimento() {
@@ -233,8 +239,19 @@ function ProspectCard({
       onClick={onOpen}
       className="w-full text-left bg-white rounded-lg border border-border/60 p-3 hover:shadow-md hover:border-primary/30 transition-all"
     >
-      <div className="font-medium text-sm truncate">
-        {prospect.nomeFantasia}
+      <div className="flex items-start justify-between gap-2">
+        <div className="font-medium text-sm truncate">
+          {prospect.nomeFantasia}
+        </div>
+        {prospect.automacaoAtiva && (
+          <span
+            title="Automação ativa"
+            className="inline-flex items-center gap-0.5 shrink-0 rounded-full bg-primary/10 px-1.5 py-0.5 text-[9px] font-medium text-primary"
+          >
+            <Zap className="w-2.5 h-2.5" />
+            Auto
+          </span>
+        )}
       </div>
       <div className="flex items-center gap-2 mt-1 text-[11px] text-muted-foreground">
         <MapPin className="w-3 h-3 shrink-0" />
@@ -288,6 +305,38 @@ function ProspectDialog({
     },
     onError: e => toast.error(e.message),
   });
+  const avancar = trpc.atendimento.avancar.useMutation({
+    onSuccess: r => {
+      toast.success(`Avançou para "${ETAPA_LABEL[r.etapa]}"`);
+      utils.atendimento.prospect.invalidate({ id: id ?? 0 });
+      onChanged();
+    },
+    onError: e => toast.error(e.message),
+  });
+  const definirAutomacao = trpc.atendimento.definirAutomacao.useMutation({
+    onSuccess: r => {
+      toast.success(
+        r.automacaoAtiva ? "Automação ativada" : "Automação desativada"
+      );
+      utils.atendimento.prospect.invalidate({ id: id ?? 0 });
+      onChanged();
+    },
+    onError: e => toast.error(e.message),
+  });
+  const linkParceiro = trpc.atendimento.linkParceiro.useMutation({
+    onSuccess: async r => {
+      const url = r.url.startsWith("http")
+        ? r.url
+        : `${window.location.origin}${r.url}`;
+      try {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link do parceiro copiado");
+      } catch {
+        toast.message(url);
+      }
+    },
+    onError: e => toast.error(e.message),
+  });
 
   const [canal, setCanal] = useState<AtendimentoCanal>("whatsapp");
   const [tipo, setTipo] = useState<AtendimentoTipo>("enviado");
@@ -300,6 +349,9 @@ function ProspectDialog({
 
   const aplicarSugestao = () => {
     if (!oficina) return;
+    const tk = oficina.tokenParceiro
+      ? `${window.location.origin}/parceiro/${oficina.tokenParceiro}`
+      : null;
     setMensagem(
       sugerirMensagem({
         nomeFantasia: oficina.nomeFantasia,
@@ -308,6 +360,7 @@ function ProspectDialog({
         estado: oficina.estado,
         canal:
           canal === "telefone" || canal === "presencial" ? "whatsapp" : canal,
+        link: tk,
       })
     );
   };
@@ -333,6 +386,9 @@ function ProspectDialog({
   const foraDoFunil = currentLaneId === "fora";
   const currentIndex = funnelLanes.findIndex(l => l.id === currentLaneId);
 
+  const link = oficina?.tokenParceiro
+    ? `${window.location.origin}/parceiro/${oficina.tokenParceiro}`
+    : null;
   const waMsg = oficina
     ? sugerirMensagem({
         nomeFantasia: oficina.nomeFantasia,
@@ -340,6 +396,7 @@ function ProspectDialog({
         cidade: oficina.cidade,
         estado: oficina.estado,
         canal: "whatsapp",
+        link,
       })
     : "";
   const emailMsg = oficina
@@ -349,6 +406,7 @@ function ProspectDialog({
         cidade: oficina.cidade,
         estado: oficina.estado,
         canal: "email",
+        link,
       })
     : "";
   const waHref = oficina
@@ -487,6 +545,84 @@ function ProspectDialog({
                       </span>
                     </p>
                   )}
+                </section>
+
+                {/* Esteira & automação */}
+                <section className="rounded-xl border bg-card p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <Zap className="h-4 w-4 text-primary" />
+                        <h3 className="text-sm font-semibold">
+                          Automação da esteira
+                        </h3>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Reconvida o prestador sozinho a cada dia até ele aceitar
+                        ou sair do funil.
+                      </p>
+                    </div>
+                    <Switch
+                      checked={oficina.automacaoAtiva}
+                      disabled={definirAutomacao.isPending}
+                      onCheckedChange={v =>
+                        id && definirAutomacao.mutate({ id, ativa: v })
+                      }
+                    />
+                  </div>
+
+                  {oficina.automacaoAtiva && (
+                    <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                      <span>
+                        Convites enviados:{" "}
+                        <span className="font-medium text-foreground">
+                          {oficina.tentativasConvite ?? 0}
+                        </span>
+                      </span>
+                      {oficina.proximaAcaoAt && (
+                        <span>
+                          Próximo reconvite:{" "}
+                          <span className="font-medium text-foreground">
+                            {new Date(oficina.proximaAcaoAt).toLocaleString(
+                              "pt-BR",
+                              {
+                                day: "2-digit",
+                                month: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              }
+                            )}
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="gap-1.5"
+                      disabled={
+                        avancar.isPending ||
+                        !proximaEtapaEsteira(oficina.etapaAtendimento)
+                      }
+                      onClick={() => id && avancar.mutate({ id })}
+                    >
+                      <ArrowRight className="h-3.5 w-3.5" />
+                      Avançar etapa
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="gap-1.5"
+                      disabled={linkParceiro.isPending}
+                      onClick={() => id && linkParceiro.mutate({ id })}
+                    >
+                      <LinkIcon className="h-3.5 w-3.5" />
+                      Copiar link do parceiro
+                    </Button>
+                  </div>
                 </section>
 
                 {/* Falar agora */}

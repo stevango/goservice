@@ -50,6 +50,13 @@
       "when": 1779305473912,
       "tag": "0006_ambiguous_spiral",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1779388927302,
+      "tag": "0007_yielding_mantis",
+      "breakpoints": true
     }
   ]
 }

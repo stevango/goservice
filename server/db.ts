@@ -1,10 +1,44 @@
-import { eq, and, like, or, sql, desc, asc, count, inArray, isNull, isNotNull, type SQL } from "drizzle-orm";
+import {
+  eq,
+  and,
+  like,
+  or,
+  sql,
+  desc,
+  asc,
+  count,
+  inArray,
+  isNull,
+  isNotNull,
+  type SQL,
+} from "drizzle-orm";
 import { type AnyMySqlColumn } from "drizzle-orm/mysql-core";
 import { drizzle } from "drizzle-orm/mysql2";
-import { InsertUser, users, oficinas, InsertOficina, Oficina, avaliacoes, InsertAvaliacao, oficinaDocumentos, InsertOficinaDocumento, clientesB2B, InsertClienteB2B, notificacoes, InsertNotificacao, importJobs, ImportJob, InsertImportJob, atendimentoEventos, AtendimentoEvento, InsertAtendimentoEvento } from "../drizzle/schema";
-import { ENV } from './_core/env';
-import { encryptOficinaFields, decryptOficinaFields } from './_core/crypto';
-import { cached, invalidatePrefix } from './_core/cache';
+import {
+  InsertUser,
+  users,
+  oficinas,
+  InsertOficina,
+  Oficina,
+  avaliacoes,
+  InsertAvaliacao,
+  oficinaDocumentos,
+  InsertOficinaDocumento,
+  clientesB2B,
+  InsertClienteB2B,
+  notificacoes,
+  InsertNotificacao,
+  importJobs,
+  ImportJob,
+  InsertImportJob,
+  atendimentoEventos,
+  AtendimentoEvento,
+  InsertAtendimentoEvento,
+} from "../drizzle/schema";
+import { ENV } from "./_core/env";
+import { encryptOficinaFields, decryptOficinaFields } from "./_core/crypto";
+import { cached, invalidatePrefix } from "./_core/cache";
+import { randomBytes } from "node:crypto";
 
 const OFICINAS_CACHE_PREFIX = "oficinas:public:";
 const OFICINAS_CACHE_TTL_MS = 30_000;
@@ -56,12 +90,24 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet[field] = normalized;
     };
     textFields.forEach(assignNullable);
-    if (user.lastSignedIn !== undefined) { values.lastSignedIn = user.lastSignedIn; updateSet.lastSignedIn = user.lastSignedIn; }
-    if (user.role !== undefined) { values.role = user.role; updateSet.role = user.role; }
-    else if (user.openId === ENV.ownerOpenId) { values.role = 'admin'; updateSet.role = 'admin'; }
+    if (user.lastSignedIn !== undefined) {
+      values.lastSignedIn = user.lastSignedIn;
+      updateSet.lastSignedIn = user.lastSignedIn;
+    }
+    if (user.role !== undefined) {
+      values.role = user.role;
+      updateSet.role = user.role;
+    } else if (user.openId === ENV.ownerOpenId) {
+      values.role = "admin";
+      updateSet.role = "admin";
+    }
     if (!values.lastSignedIn) values.lastSignedIn = new Date();
-    if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    if (Object.keys(updateSet).length === 0)
+      updateSet.lastSignedIn = new Date();
+    await db
+      .insert(users)
+      .values(values)
+      .onDuplicateKeyUpdate({ set: updateSet });
   } catch (error) {
     console.error("[Database] Failed to upsert user:", error);
     throw error;
@@ -71,7 +117,11 @@ export async function upsertUser(user: InsertUser): Promise<void> {
 export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
+  const result = await db
+    .select()
+    .from(users)
+    .where(eq(users.openId, openId))
+    .limit(1);
   return result.length > 0 ? result[0] : undefined;
 }
 
@@ -108,18 +158,28 @@ export async function createOficina(data: InsertOficina) {
 export async function updateOficina(id: number, data: Partial<InsertOficina>) {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
-  await db.update(oficinas).set(encryptOficinaFields(data)).where(eq(oficinas.id, id));
+  await db
+    .update(oficinas)
+    .set(encryptOficinaFields(data))
+    .where(eq(oficinas.id, id));
   invalidatePrefix(OFICINAS_CACHE_PREFIX);
 }
 
 export async function getOficinaById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(oficinas).where(eq(oficinas.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(oficinas)
+    .where(eq(oficinas.id, id))
+    .limit(1);
   const oficina = decryptOficinaFields(result[0]);
 
   if (oficina) {
-    const fotos = await db.select().from(oficinaDocumentos).where(eq(oficinaDocumentos.oficinaId, id));
+    const fotos = await db
+      .select()
+      .from(oficinaDocumentos)
+      .where(eq(oficinaDocumentos.oficinaId, id));
     return { ...oficina, fotos };
   }
 
@@ -129,7 +189,11 @@ export async function getOficinaById(id: number) {
 export async function getOficinaByUserId(userId: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(oficinas).where(eq(oficinas.userId, userId)).limit(1);
+  const result = await db
+    .select()
+    .from(oficinas)
+    .where(eq(oficinas.userId, userId))
+    .limit(1);
   return decryptOficinaFields(result[0]) || undefined;
 }
 
@@ -151,13 +215,17 @@ export async function listOficinas(filters?: {
 
   const conditions: any[] = [];
 
-  if (filters?.status) conditions.push(eq(oficinas.status, filters.status as any));
-  if (filters?.categoria) conditions.push(eq(oficinas.categoria, filters.categoria as any));
-  if (filters?.segmento) conditions.push(eq(oficinas.segmento, filters.segmento));
+  if (filters?.status)
+    conditions.push(eq(oficinas.status, filters.status as any));
+  if (filters?.categoria)
+    conditions.push(eq(oficinas.categoria, filters.categoria as any));
+  if (filters?.segmento)
+    conditions.push(eq(oficinas.segmento, filters.segmento));
   if (filters?.segmentos && filters.segmentos.length > 0) {
     conditions.push(inArray(oficinas.segmento, filters.segmentos));
   }
-  if (filters?.cidade) conditions.push(like(oficinas.cidade, `%${filters.cidade}%`));
+  if (filters?.cidade)
+    conditions.push(like(oficinas.cidade, `%${filters.cidade}%`));
   if (filters?.estado) conditions.push(eq(oficinas.estado, filters.estado));
   if (filters?.search) {
     conditions.push(
@@ -171,10 +239,14 @@ export async function listOficinas(filters?: {
   // Filtra arrays JSON no banco (não na aplicação) para que paginação e
   // contagem fiquem corretas.
   if (filters?.tipoVeiculo) {
-    conditions.push(sql`JSON_CONTAINS(${oficinas.tiposVeiculos}, ${JSON.stringify(filters.tipoVeiculo)})`);
+    conditions.push(
+      sql`JSON_CONTAINS(${oficinas.tiposVeiculos}, ${JSON.stringify(filters.tipoVeiculo)})`
+    );
   }
   if (filters?.tipoServico) {
-    conditions.push(sql`JSON_CONTAINS(${oficinas.tiposServicos}, ${JSON.stringify(filters.tipoServico)})`);
+    conditions.push(
+      sql`JSON_CONTAINS(${oficinas.tiposServicos}, ${JSON.stringify(filters.tipoServico)})`
+    );
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -182,8 +254,14 @@ export async function listOficinas(filters?: {
   const offset = filters?.offset || 0;
 
   const [rows, totalResult] = await Promise.all([
-    db.select().from(oficinas).where(where).orderBy(desc(oficinas.scoreReputacao)).limit(limit).offset(offset),
-    db.select({ count: count() }).from(oficinas).where(where)
+    db
+      .select()
+      .from(oficinas)
+      .where(where)
+      .orderBy(desc(oficinas.scoreReputacao))
+      .limit(limit)
+      .offset(offset),
+    db.select({ count: count() }).from(oficinas).where(where),
   ]);
 
   return { oficinas: rows, total: totalResult[0]?.count || 0 };
@@ -286,17 +364,19 @@ export async function getOficinasMetrics(): Promise<DashboardMetrics> {
   const segMap = new Map<string, DashboardMetrics["porSegmento"][number]>();
   for (const r of segRows) {
     const seg = r.segmento || "desconhecido";
-    const e =
-      segMap.get(seg) ?? { segmento: seg, total: 0, ativas: 0, pendentes: 0 };
+    const e = segMap.get(seg) ?? {
+      segmento: seg,
+      total: 0,
+      ativas: 0,
+      pendentes: 0,
+    };
     const c = Number(r.count);
     e.total += c;
     if (r.status === "ativa") e.ativas += c;
     if (r.status === "pendente") e.pendentes += c;
     segMap.set(seg, e);
   }
-  m.porSegmento = Array.from(segMap.values()).sort(
-    (a, b) => b.total - a.total
-  );
+  m.porSegmento = Array.from(segMap.values()).sort((a, b) => b.total - a.total);
 
   const cnt = async (cond: SQL): Promise<number> => {
     const r = await db.select({ c: count() }).from(oficinas).where(cond);
@@ -344,11 +424,18 @@ export async function getOficinasMetrics(): Promise<DashboardMetrics> {
 // ==================== AVALIAÇÕES ====================
 
 // Antifraude: uma avaliação por usuário por oficina.
-export async function getAvaliacaoByUserAndOficina(userId: number, oficinaId: number) {
+export async function getAvaliacaoByUserAndOficina(
+  userId: number,
+  oficinaId: number
+) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(avaliacoes)
-    .where(and(eq(avaliacoes.userId, userId), eq(avaliacoes.oficinaId, oficinaId)))
+  const result = await db
+    .select()
+    .from(avaliacoes)
+    .where(
+      and(eq(avaliacoes.userId, userId), eq(avaliacoes.oficinaId, oficinaId))
+    )
     .limit(1);
   return result[0] || undefined;
 }
@@ -366,21 +453,30 @@ export async function createAvaliacao(data: InsertAvaliacao) {
 export async function recalcularScore(oficinaId: number) {
   const db = await getDb();
   if (!db) return;
-  
-  const result = await db.select({
-    avg: sql<number>`AVG(notaGeral)`,
-    total: count()
-  }).from(avaliacoes).where(
-    and(eq(avaliacoes.oficinaId, oficinaId), eq(avaliacoes.status, "aprovada"))
-  );
+
+  const result = await db
+    .select({
+      avg: sql<number>`AVG(notaGeral)`,
+      total: count(),
+    })
+    .from(avaliacoes)
+    .where(
+      and(
+        eq(avaliacoes.oficinaId, oficinaId),
+        eq(avaliacoes.status, "aprovada")
+      )
+    );
 
   const avg = result[0]?.avg || 0;
   const total = Number(result[0]?.total || 0);
-  
-  await db.update(oficinas).set({
-    scoreReputacao: String(Math.round(avg * 10) / 10),
-    totalAvaliacoes: total
-  }).where(eq(oficinas.id, oficinaId));
+
+  await db
+    .update(oficinas)
+    .set({
+      scoreReputacao: String(Math.round(avg * 10) / 10),
+      totalAvaliacoes: total,
+    })
+    .where(eq(oficinas.id, oficinaId));
 
   // O score altera a ordenação da listagem pública em cache.
   invalidatePrefix(OFICINAS_CACHE_PREFIX);
@@ -389,22 +485,44 @@ export async function recalcularScore(oficinaId: number) {
 export async function listAvaliacoes(oficinaId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(avaliacoes).where(eq(avaliacoes.oficinaId, oficinaId)).orderBy(desc(avaliacoes.createdAt));
+  return db
+    .select()
+    .from(avaliacoes)
+    .where(eq(avaliacoes.oficinaId, oficinaId))
+    .orderBy(desc(avaliacoes.createdAt));
 }
 
-export async function listAllAvaliacoes(filters?: { status?: string; limit?: number; offset?: number }) {
+export async function listAllAvaliacoes(filters?: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
   const db = await getDb();
   if (!db) return [];
   const conditions: any[] = [];
-  if (filters?.status) conditions.push(eq(avaliacoes.status, filters.status as any));
+  if (filters?.status)
+    conditions.push(eq(avaliacoes.status, filters.status as any));
   const where = conditions.length > 0 ? and(...conditions) : undefined;
-  return db.select().from(avaliacoes).where(where).orderBy(desc(avaliacoes.createdAt)).limit(filters?.limit || 50).offset(filters?.offset || 0);
+  return db
+    .select()
+    .from(avaliacoes)
+    .where(where)
+    .orderBy(desc(avaliacoes.createdAt))
+    .limit(filters?.limit || 50)
+    .offset(filters?.offset || 0);
 }
 
-export async function updateAvaliacaoStatus(id: number, status: "aprovada" | "rejeitada") {
+export async function updateAvaliacaoStatus(
+  id: number,
+  status: "aprovada" | "rejeitada"
+) {
   const db = await getDb();
   if (!db) return;
-  const avaliacao = await db.select().from(avaliacoes).where(eq(avaliacoes.id, id)).limit(1);
+  const avaliacao = await db
+    .select()
+    .from(avaliacoes)
+    .where(eq(avaliacoes.id, id))
+    .limit(1);
   await db.update(avaliacoes).set({ status }).where(eq(avaliacoes.id, id));
   if (avaliacao[0]) await recalcularScore(avaliacao[0].oficinaId);
 }
@@ -421,7 +539,10 @@ export async function addDocumento(data: InsertOficinaDocumento) {
 export async function listDocumentos(oficinaId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(oficinaDocumentos).where(eq(oficinaDocumentos.oficinaId, oficinaId));
+  return db
+    .select()
+    .from(oficinaDocumentos)
+    .where(eq(oficinaDocumentos.oficinaId, oficinaId));
 }
 
 // ==================== CLIENTES B2B ====================
@@ -439,7 +560,10 @@ export async function listClientesB2B() {
   return db.select().from(clientesB2B).orderBy(desc(clientesB2B.createdAt));
 }
 
-export async function updateClienteB2B(id: number, data: Partial<InsertClienteB2B>) {
+export async function updateClienteB2B(
+  id: number,
+  data: Partial<InsertClienteB2B>
+) {
   const db = await getDb();
   if (!db) return;
   await db.update(clientesB2B).set(data).where(eq(clientesB2B.id, id));
@@ -448,7 +572,11 @@ export async function updateClienteB2B(id: number, data: Partial<InsertClienteB2
 export async function getClienteB2BByUserId(userId: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(clientesB2B).where(eq(clientesB2B.userId, userId)).limit(1);
+  const result = await db
+    .select()
+    .from(clientesB2B)
+    .where(eq(clientesB2B.userId, userId))
+    .limit(1);
   return result[0] || undefined;
 }
 
@@ -463,30 +591,47 @@ export async function createNotificacao(data: InsertNotificacao) {
 export async function listNotificacoes(limit = 20) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(notificacoes).orderBy(desc(notificacoes.createdAt)).limit(limit);
+  return db
+    .select()
+    .from(notificacoes)
+    .orderBy(desc(notificacoes.createdAt))
+    .limit(limit);
 }
 
 export async function markNotificacaoLida(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(notificacoes).set({ lida: true }).where(eq(notificacoes.id, id));
+  await db
+    .update(notificacoes)
+    .set({ lida: true })
+    .where(eq(notificacoes.id, id));
 }
 
 export async function countNotificacoesNaoLidas() {
   const db = await getDb();
   if (!db) return 0;
-  const result = await db.select({ count: count() }).from(notificacoes).where(eq(notificacoes.lida, false));
+  const result = await db
+    .select({ count: count() })
+    .from(notificacoes)
+    .where(eq(notificacoes.lida, false));
   return Number(result[0]?.count || 0);
 }
 
 export async function getClienteB2BById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
-  const result = await db.select().from(clientesB2B).where(eq(clientesB2B.id, id)).limit(1);
+  const result = await db
+    .select()
+    .from(clientesB2B)
+    .where(eq(clientesB2B.id, id))
+    .limit(1);
   return result[0] || undefined;
 }
 
-export async function updateUserRole(userId: number, role: "user" | "admin" | "oficina" | "b2b") {
+export async function updateUserRole(
+  userId: number,
+  role: "user" | "admin" | "oficina" | "b2b"
+) {
   const db = await getDb();
   if (!db) return;
   await db.update(users).set({ role }).where(eq(users.id, userId));
@@ -494,7 +639,9 @@ export async function updateUserRole(userId: number, role: "user" | "admin" | "o
 
 // ==================== IMPORTAÇÃO (Google Places) ====================
 
-export async function oficinaExistsByGooglePlaceId(placeId: string): Promise<boolean> {
+export async function oficinaExistsByGooglePlaceId(
+  placeId: string
+): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
   const result = await db
@@ -505,7 +652,9 @@ export async function oficinaExistsByGooglePlaceId(placeId: string): Promise<boo
   return result.length > 0;
 }
 
-export async function insertImportedOficina(data: InsertOficina): Promise<number> {
+export async function insertImportedOficina(
+  data: InsertOficina
+): Promise<number> {
   const db = await getDb();
   if (!db) throw new Error("Database not available");
   const result = await db.insert(oficinas).values(data);
@@ -598,7 +747,12 @@ export async function cancelImportJob(id: number): Promise<void> {
   await db
     .update(importJobs)
     .set({ status: "cancelado" })
-    .where(and(eq(importJobs.id, id), inArray(importJobs.status, ["pendente", "rodando"])));
+    .where(
+      and(
+        eq(importJobs.id, id),
+        inArray(importJobs.status, ["pendente", "rodando"])
+      )
+    );
 }
 
 // ==================== ATENDIMENTO (Centro de Conversão) ====================
@@ -626,12 +780,20 @@ function prospectConditions(f: ProspectFilters): SQL | undefined {
   if (f.estado) conds.push(eq(oficinas.estado, f.estado));
   if (f.segmento) conds.push(eq(oficinas.segmento, f.segmento));
   if (f.etapas && f.etapas.length > 0) {
-    conds.push(inArray(oficinas.etapaAtendimento, f.etapas as Array<typeof oficinas.etapaAtendimento.enumValues[number]>));
+    conds.push(
+      inArray(
+        oficinas.etapaAtendimento,
+        f.etapas as Array<(typeof oficinas.etapaAtendimento.enumValues)[number]>
+      )
+    );
   }
   return conds.length ? (and(...conds) as SQL) : undefined;
 }
 
-export async function listProspects(filters: ProspectFilters = {}, limit = 300) {
+export async function listProspects(
+  filters: ProspectFilters = {},
+  limit = 300
+) {
   const db = await getDb();
   if (!db) return [];
   const where = prospectConditions(filters);
@@ -651,6 +813,7 @@ export async function listProspects(filters: ProspectFilters = {}, limit = 300) 
       totalAvaliacoes: oficinas.totalAvaliacoes,
       etapaAtendimento: oficinas.etapaAtendimento,
       status: oficinas.status,
+      automacaoAtiva: oficinas.automacaoAtiva,
     })
     .from(oficinas);
   return (where ? q.where(where) : q)
@@ -667,7 +830,9 @@ export async function countByEtapa(
   const q = db
     .select({ etapa: oficinas.etapaAtendimento, c: count() })
     .from(oficinas);
-  const rows = await (where ? q.where(where) : q).groupBy(oficinas.etapaAtendimento);
+  const rows = await (where ? q.where(where) : q).groupBy(
+    oficinas.etapaAtendimento
+  );
   const out: Record<string, number> = {};
   for (const r of rows) out[String(r.etapa)] = Number(r.c);
   return out;
@@ -692,4 +857,82 @@ export async function listAtendimentoEventos(
     .from(atendimentoEventos)
     .where(eq(atendimentoEventos.oficinaId, oficinaId))
     .orderBy(desc(atendimentoEventos.createdAt));
+}
+
+// ==================== AUTOMAÇÃO DA ESTEIRA ====================
+
+// Gera (se faltar) e devolve o token do link rastreável do parceiro.
+export async function ensureTokenParceiro(id: number): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const of = await getOficinaById(id);
+  if (of?.tokenParceiro) return of.tokenParceiro;
+  const token = randomBytes(20).toString("hex");
+  await db
+    .update(oficinas)
+    .set({ tokenParceiro: token })
+    .where(eq(oficinas.id, id));
+  invalidatePrefix(OFICINAS_CACHE_PREFIX);
+  return token;
+}
+
+export async function getOficinaByToken(token: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select()
+    .from(oficinas)
+    .where(eq(oficinas.tokenParceiro, token))
+    .limit(1);
+  return rows.length ? decryptOficinaFields(rows[0]) : undefined;
+}
+
+export type ProspectAutomacao = {
+  id: number;
+  nomeFantasia: string;
+  segmento: string | null;
+  cidade: string | null;
+  estado: string | null;
+  telefone: string | null;
+  whatsapp: string | null;
+  email: string | null;
+  etapaAtendimento: string;
+  tokenParceiro: string | null;
+  tentativasConvite: number;
+};
+
+// Prospects com automação ligada e ação vencida — alvo do worker.
+export async function listProspectsParaAutomacao(
+  now: Date,
+  limit = 50
+): Promise<ProspectAutomacao[]> {
+  const db = await getDb();
+  if (!db) return [];
+  const rows = await db
+    .select({
+      id: oficinas.id,
+      nomeFantasia: oficinas.nomeFantasia,
+      segmento: oficinas.segmento,
+      cidade: oficinas.cidade,
+      estado: oficinas.estado,
+      telefone: oficinas.telefone,
+      whatsapp: oficinas.whatsapp,
+      email: oficinas.email,
+      etapaAtendimento: oficinas.etapaAtendimento,
+      tokenParceiro: oficinas.tokenParceiro,
+      tentativasConvite: oficinas.tentativasConvite,
+    })
+    .from(oficinas)
+    .where(
+      and(
+        eq(oficinas.automacaoAtiva, true),
+        or(
+          isNull(oficinas.proximaAcaoAt),
+          sql`${oficinas.proximaAcaoAt} <= ${now}`
+        )
+      )
+    )
+    .orderBy(asc(oficinas.proximaAcaoAt))
+    .limit(limit);
+  return rows as ProspectAutomacao[];
 }

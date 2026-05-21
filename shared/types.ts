@@ -510,6 +510,78 @@ export function laneDaEtapa(etapa: string | null | undefined): string {
   );
 }
 
+// ---- Esteira de conversão (avanço manual e automação) ----
+
+// Caminho linear "para frente" usado pelo botão de avanço manual.
+export const ESTEIRA_AVANCO: AtendimentoEtapa[] = [
+  "lead_encontrado",
+  "convite_enviado",
+  "convite_entregue",
+  "visualizou",
+  "followup_1",
+  "followup_2",
+  "negociando",
+  "interesse_demonstrado",
+  "cadastro_iniciado",
+  "cadastro_concluido",
+  "ativado",
+  "operando",
+];
+
+export function proximaEtapaEsteira(
+  etapa: AtendimentoEtapa | string
+): AtendimentoEtapa | null {
+  const i = ESTEIRA_AVANCO.indexOf(etapa as AtendimentoEtapa);
+  if (i === -1 || i === ESTEIRA_AVANCO.length - 1) return null;
+  return ESTEIRA_AVANCO[i + 1];
+}
+
+// Etapas em que a automação ainda deve reconvidar o prestador.
+const ETAPAS_CONVIDAVEIS: AtendimentoEtapa[] = [
+  "lead_encontrado",
+  "convite_enviado",
+  "convite_entregue",
+  "visualizou",
+  "nao_respondeu",
+  "followup_1",
+  "followup_2",
+];
+
+export function etapaConvidavel(etapa: AtendimentoEtapa | string): boolean {
+  return ETAPAS_CONVIDAVEIS.includes(etapa as AtendimentoEtapa);
+}
+
+// A automação encerra quando o prestador aceita (entra no cadastro/ativação)
+// ou sai do funil (recusou/inativo).
+export function etapaEncerraAutomacao(
+  etapa: AtendimentoEtapa | string
+): boolean {
+  return !etapaConvidavel(etapa) || etapa === "recusou" || etapa === "inativo";
+}
+
+// Próxima etapa que a automação aplica a cada reconvite. Mantém em
+// followup_2 quando já está reconvidando há tempo (segue diariamente).
+export function proximaEtapaCadencia(
+  etapa: AtendimentoEtapa | string
+): AtendimentoEtapa {
+  switch (etapa) {
+    case "lead_encontrado":
+      return "convite_enviado";
+    case "convite_enviado":
+    case "convite_entregue":
+    case "visualizou":
+    case "nao_respondeu":
+      return "followup_1";
+    case "followup_1":
+      return "followup_2";
+    default:
+      return "followup_2";
+  }
+}
+
+// Intervalo entre reconvites da automação (em horas). 24h = todo dia.
+export const AUTOMACAO_CADENCIA_HORAS = 24;
+
 export const ATENDIMENTO_CANAIS = [
   "email",
   "whatsapp",
@@ -572,21 +644,26 @@ export function sugerirMensagem(input: {
   cidade: string | null | undefined;
   estado: string | null | undefined;
   canal: AtendimentoCanal;
+  // Link rastreável da página do parceiro (CTA de credenciamento).
+  link?: string | null;
 }): string {
   const grupo =
     (input.segmento && SEGMENTO_INFO[input.segmento]?.grupo) || "Automotivo";
   const abertura = ABERTURA_GRUPO[grupo] ?? ABERTURA_GRUPO["Automotivo"];
   const local = [input.cidade, input.estado].filter(Boolean).join("/");
+  const cta = input.link
+    ? `\n\nQuero credenciar minha unidade: ${input.link}`
+    : "";
   if (input.canal === "whatsapp") {
-    return `Olá, equipe da ${input.nomeFantasia}! Aqui é da GO SERVICE. ${abertura} Posso enviar mais detalhes sobre como credenciar ${local ? `a sua unidade em ${local}` : "sua unidade"} sem custo?`;
+    return `Olá, equipe da ${input.nomeFantasia}! Aqui é da GO SERVICE. ${abertura} Posso enviar mais detalhes sobre como credenciar ${local ? `a sua unidade em ${local}` : "sua unidade"} sem custo?${cta}`;
   }
   if (input.canal === "sms") {
-    return `GO SERVICE: ${abertura} Responda SIM para receber os detalhes do credenciamento.`;
+    return `GO SERVICE: ${abertura} Responda SIM para receber os detalhes do credenciamento.${cta}`;
   }
   if (input.canal === "email") {
-    return `Olá, ${input.nomeFantasia},\n\n${abertura}\n\nA GO SERVICE é a maior rede multissegmento de prestadores credenciados do Brasil. Conectamos seguradoras, associações e clientes finais à melhor estrutura local${local ? ` em ${local}` : ""}.\n\nPosso agendar uma conversa rápida (15 min) para apresentar a oportunidade?\n\nAtt,\nEquipe GO SERVICE`;
+    return `Olá, ${input.nomeFantasia},\n\n${abertura}\n\nA GO SERVICE é a maior rede multissegmento de prestadores credenciados do Brasil. Conectamos seguradoras, associações e clientes finais à melhor estrutura local${local ? ` em ${local}` : ""}.\n\nPosso agendar uma conversa rápida (15 min) para apresentar a oportunidade?${cta}\n\nAtt,\nEquipe GO SERVICE`;
   }
-  return `${abertura} Vamos conversar sobre o credenciamento da ${input.nomeFantasia}${local ? ` em ${local}` : ""}.`;
+  return `${abertura} Vamos conversar sobre o credenciamento da ${input.nomeFantasia}${local ? ` em ${local}` : ""}.${cta}`;
 }
 
 export function assuntoEmail(nomeFantasia: string): string {

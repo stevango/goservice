@@ -18,6 +18,7 @@ import OficinaDetalhe from "./pages/OficinaDetalhe";
 import MinhaOficina from "./pages/MinhaOficina";
 import AdminAtendimento from "./pages/admin/AdminAtendimento";
 import AdminImportar from "./pages/admin/AdminImportar";
+import PaginaParceiro from "./pages/PaginaParceiro";
 import Login from "./pages/Login";
 
 function Router() {
@@ -27,6 +28,7 @@ function Router() {
       <Route path="/login" component={Login} />
       <Route path="/buscar" component={BuscarOficinas} />
       <Route path="/oficina/:id" component={OficinaDetalhe} />
+      <Route path="/parceiro/:token" component={PaginaParceiro} />
       <Route path="/cadastro" component={CadastroOficina} />
       <Route path="/minha-oficina" component={MinhaOficina} />
       <Route path="/admin" component={AdminDashboard} />

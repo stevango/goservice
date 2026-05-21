@@ -112,6 +112,16 @@ export const oficinas = mysqlTable("oficinas", {
     "inativo",
   ]).default("lead_encontrado").notNull(),
 
+  // Automação da esteira de conversão. Quando ativa, o worker reconvida
+  // o prestador na cadência definida até ele aceitar (clicar no CTA) ou
+  // ser marcado como fora do funil.
+  automacaoAtiva: boolean("automacaoAtiva").default(false).notNull(),
+  proximaAcaoAt: timestamp("proximaAcaoAt"),
+  ultimoContatoAt: timestamp("ultimoContatoAt"),
+  tentativasConvite: int("tentativasConvite").default(0).notNull(),
+  // Token do link rastreável da página do parceiro (CTA de credenciamento).
+  tokenParceiro: varchar("tokenParceiro", { length: 40 }),
+
   // Dedup de importação automática (Google Places)
   googlePlaceId: varchar("googlePlaceId", { length: 128 }),
 
@@ -124,6 +134,9 @@ export const oficinas = mysqlTable("oficinas", {
   estadoIdx: index("oficinas_estado_idx").on(t.estado),
   categoriaIdx: index("oficinas_categoria_idx").on(t.categoria),
   googlePlaceIdIdx: index("oficinas_google_place_id_idx").on(t.googlePlaceId),
+  // Worker da automação: busca quem está com ação vencida.
+  automacaoIdx: index("oficinas_automacao_idx").on(t.automacaoAtiva, t.proximaAcaoAt),
+  tokenParceiroIdx: index("oficinas_token_parceiro_idx").on(t.tokenParceiro),
 }));
 
 export type Oficina = typeof oficinas.$inferSelect;

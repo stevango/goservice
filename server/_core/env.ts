@@ -9,4 +9,7 @@ export const ENV = {
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY ?? "",
+  // URL pública do app, usada para montar o link rastreável do parceiro
+  // no worker de automação (onde não há window.location).
+  appUrl: (process.env.APP_URL ?? "").replace(/\/+$/, ""),
 };
