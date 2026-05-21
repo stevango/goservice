@@ -32,6 +32,7 @@ import {
   StickyNote,
   Check,
   ChevronLeft,
+  Eye,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
@@ -292,6 +293,7 @@ function ProspectDialog({
   const [tipo, setTipo] = useState<AtendimentoTipo>("enviado");
   const [novaEtapa, setNovaEtapa] = useState<string>("");
   const [mensagem, setMensagem] = useState("");
+  const [previewOpen, setPreviewOpen] = useState(false);
 
   const oficina = q.data?.oficina;
   const eventos = q.data?.eventos ?? [];
@@ -360,224 +362,72 @@ function ProspectDialog({
     : null;
 
   return (
-    <Dialog open={!!id} onOpenChange={o => !o && onClose()}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
-        {q.isLoading || !oficina ? (
-          <div className="flex justify-center py-16">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : (
-          <>
-            {/* Cabeçalho */}
-            <DialogHeader className="space-y-0 px-6 pt-6 pb-5 border-b bg-muted/30">
-              <div className="flex items-start gap-4 pr-8">
-                <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0">
-                  {inicial}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <DialogTitle className="text-xl leading-tight truncate">
-                    {oficina.nomeFantasia}
-                  </DialogTitle>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-muted-foreground">
-                    <Badge variant="secondary" className="font-normal">
-                      {segmentoLabel(oficina.segmento)}
-                    </Badge>
-                    <span className="inline-flex items-center gap-1">
-                      <MapPin className="w-3.5 h-3.5" />
-                      {oficina.cidade}/{oficina.estado}
-                    </span>
-                    <span className="inline-flex items-center gap-1">
-                      <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      {Number(oficina.scoreReputacao ?? 0).toFixed(1)}
-                      <span className="text-muted-foreground/70">
-                        · {oficina.totalAvaliacoes ?? 0} avaliações
+    <>
+      <Dialog open={!!id} onOpenChange={o => !o && onClose()}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+          {q.isLoading || !oficina ? (
+            <div className="flex justify-center py-16">
+              <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <>
+              {/* Cabeçalho */}
+              <DialogHeader className="space-y-0 px-6 pt-6 pb-5 border-b bg-muted/30">
+                <div className="flex items-start gap-4 pr-8">
+                  <div className="w-12 h-12 rounded-xl bg-primary/10 text-primary flex items-center justify-center text-lg font-bold shrink-0">
+                    {inicial}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <DialogTitle className="text-xl leading-tight truncate">
+                      {oficina.nomeFantasia}
+                    </DialogTitle>
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-2 text-sm text-muted-foreground">
+                      <Badge variant="secondary" className="font-normal">
+                        {segmentoLabel(oficina.segmento)}
+                      </Badge>
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="w-3.5 h-3.5" />
+                        {oficina.cidade}/{oficina.estado}
                       </span>
-                    </span>
+                      <span className="inline-flex items-center gap-1">
+                        <Star className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                        {Number(oficina.scoreReputacao ?? 0).toFixed(1)}
+                        <span className="text-muted-foreground/70">
+                          · {oficina.totalAvaliacoes ?? 0} avaliações
+                        </span>
+                      </span>
+                    </div>
                   </div>
-                </div>
-                <Button
-                  asChild
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0 gap-1.5"
-                >
-                  <Link href={`/admin/oficinas/${oficina.id}`}>
-                    Ver ficha
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </Link>
-                </Button>
-              </div>
-            </DialogHeader>
-
-            <div className="px-6 py-5 space-y-6">
-              {/* Posição no funil */}
-              <section>
-                <div className="flex items-center justify-between mb-3">
-                  <SectionLabel>Posição no funil</SectionLabel>
-                  <Select
-                    value=""
-                    onValueChange={v =>
-                      id &&
-                      mudarEtapa.mutate({ id, etapa: v as AtendimentoEtapa })
-                    }
-                  >
-                    <SelectTrigger className="h-8 w-auto gap-1.5 text-xs">
-                      <SelectValue placeholder="Mover etapa" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {ATENDIMENTO_ETAPAS.map(et => (
-                        <SelectItem key={et} value={et}>
-                          {ETAPA_LABEL[et]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {foraDoFunil ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between">
-                    <span className="text-sm font-medium text-red-700">
-                      Fora do funil
-                    </span>
-                    <Badge className="bg-red-100 text-red-700 border-0">
-                      {ETAPA_LABEL[
-                        oficina.etapaAtendimento as AtendimentoEtapa
-                      ] ?? oficina.etapaAtendimento}
-                    </Badge>
-                  </div>
-                ) : (
-                  <div className="flex items-stretch gap-1.5">
-                    {funnelLanes.map((lane, i) => {
-                      const done = i < currentIndex;
-                      const atual = i === currentIndex;
-                      return (
-                        <div key={lane.id} className="flex-1 min-w-0">
-                          <div
-                            className={`h-1.5 rounded-full transition-colors ${
-                              done || atual ? "bg-primary" : "bg-muted"
-                            }`}
-                          />
-                          <div
-                            className={`mt-1.5 flex items-center gap-1 text-[11px] truncate ${
-                              atual
-                                ? "font-semibold text-foreground"
-                                : "text-muted-foreground"
-                            }`}
-                          >
-                            {done && (
-                              <Check className="w-3 h-3 text-primary shrink-0" />
-                            )}
-                            <span className="truncate">{lane.label}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {!foraDoFunil && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Etapa atual:{" "}
-                    <span className="font-medium text-foreground">
-                      {ETAPA_LABEL[
-                        oficina.etapaAtendimento as AtendimentoEtapa
-                      ] ?? oficina.etapaAtendimento}
-                    </span>
-                  </p>
-                )}
-              </section>
-
-              {/* Falar agora */}
-              <section>
-                <SectionLabel className="mb-3">
-                  Falar com o prospect
-                </SectionLabel>
-                <div className="grid grid-cols-3 gap-2">
-                  <AcaoCanal
-                    href={waHref}
-                    onClick={() => setCanal("whatsapp")}
-                    icon={<MessageCircle className="w-4 h-4" />}
-                    label="WhatsApp"
-                    className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
-                  />
-                  <AcaoCanal
-                    href={telHref}
-                    onClick={() => setCanal("telefone")}
-                    icon={<Phone className="w-4 h-4" />}
-                    label="Ligar"
-                    className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-                  />
-                  <AcaoCanal
-                    href={emailHref}
-                    onClick={() => setCanal("email")}
-                    icon={<Mail className="w-4 h-4" />}
-                    label="E-mail"
-                    className="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
-                  />
-                </div>
-                <p className="mt-2 text-[11px] text-muted-foreground">
-                  Abre o canal com a mensagem sugerida já preenchida. Depois,
-                  registre o contato abaixo.
-                </p>
-              </section>
-
-              {/* Registrar contato */}
-              <section className="rounded-xl border bg-card p-4">
-                <div className="flex items-center justify-between mb-3">
-                  <SectionLabel>Registrar contato</SectionLabel>
                   <Button
+                    asChild
+                    variant="outline"
                     size="sm"
-                    variant="ghost"
-                    className="h-7 text-xs gap-1"
-                    onClick={aplicarSugestao}
+                    className="shrink-0 gap-1.5"
                   >
-                    <Sparkles className="w-3.5 h-3.5" /> Sugerir mensagem
+                    <Link href={`/admin/oficinas/${oficina.id}`}>
+                      Ver ficha
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Link>
                   </Button>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
-                  <CampoSelect label="Canal">
+              </DialogHeader>
+
+              <div className="px-6 py-5 space-y-6">
+                {/* Posição no funil */}
+                <section>
+                  <div className="flex items-center justify-between mb-3">
+                    <SectionLabel>Posição no funil</SectionLabel>
                     <Select
-                      value={canal}
-                      onValueChange={v => setCanal(v as AtendimentoCanal)}
+                      value=""
+                      onValueChange={v =>
+                        id &&
+                        mudarEtapa.mutate({ id, etapa: v as AtendimentoEtapa })
+                      }
                     >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ATENDIMENTO_CANAIS.map(c => (
-                          <SelectItem key={c} value={c}>
-                            {CANAL_LABEL[c]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </CampoSelect>
-                  <CampoSelect label="Resultado">
-                    <Select
-                      value={tipo}
-                      onValueChange={v => setTipo(v as AtendimentoTipo)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {ATENDIMENTO_TIPOS.map(t => (
-                          <SelectItem key={t} value={t}>
-                            {TIPO_LABEL[t]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </CampoSelect>
-                  <CampoSelect label="Mover para">
-                    <Select
-                      value={novaEtapa || NENHUMA}
-                      onValueChange={v => setNovaEtapa(v === NENHUMA ? "" : v)}
-                    >
-                      <SelectTrigger>
+                      <SelectTrigger className="h-8 w-auto gap-1.5 text-xs">
                         <SelectValue placeholder="Mover etapa" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={NENHUMA}>Manter etapa</SelectItem>
                         {ATENDIMENTO_ETAPAS.map(et => (
                           <SelectItem key={et} value={et}>
                             {ETAPA_LABEL[et]}
@@ -585,106 +435,311 @@ function ProspectDialog({
                         ))}
                       </SelectContent>
                     </Select>
-                  </CampoSelect>
-                </div>
-                <div className="grid gap-4 md:grid-cols-2">
+                  </div>
+
+                  {foraDoFunil ? (
+                    <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 flex items-center justify-between">
+                      <span className="text-sm font-medium text-red-700">
+                        Fora do funil
+                      </span>
+                      <Badge className="bg-red-100 text-red-700 border-0">
+                        {ETAPA_LABEL[
+                          oficina.etapaAtendimento as AtendimentoEtapa
+                        ] ?? oficina.etapaAtendimento}
+                      </Badge>
+                    </div>
+                  ) : (
+                    <div className="flex items-stretch gap-1.5">
+                      {funnelLanes.map((lane, i) => {
+                        const done = i < currentIndex;
+                        const atual = i === currentIndex;
+                        return (
+                          <div key={lane.id} className="flex-1 min-w-0">
+                            <div
+                              className={`h-1.5 rounded-full transition-colors ${
+                                done || atual ? "bg-primary" : "bg-muted"
+                              }`}
+                            />
+                            <div
+                              className={`mt-1.5 flex items-center gap-1 text-[11px] truncate ${
+                                atual
+                                  ? "font-semibold text-foreground"
+                                  : "text-muted-foreground"
+                              }`}
+                            >
+                              {done && (
+                                <Check className="w-3 h-3 text-primary shrink-0" />
+                              )}
+                              <span className="truncate">{lane.label}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                  {!foraDoFunil && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      Etapa atual:{" "}
+                      <span className="font-medium text-foreground">
+                        {ETAPA_LABEL[
+                          oficina.etapaAtendimento as AtendimentoEtapa
+                        ] ?? oficina.etapaAtendimento}
+                      </span>
+                    </p>
+                  )}
+                </section>
+
+                {/* Falar agora */}
+                <section>
+                  <SectionLabel className="mb-3">
+                    Falar com o prospect
+                  </SectionLabel>
+                  <div className="grid grid-cols-3 gap-2">
+                    <AcaoCanal
+                      href={waHref}
+                      onClick={() => setCanal("whatsapp")}
+                      icon={<MessageCircle className="w-4 h-4" />}
+                      label="WhatsApp"
+                      className="border-green-200 bg-green-50 text-green-700 hover:bg-green-100"
+                    />
+                    <AcaoCanal
+                      href={telHref}
+                      onClick={() => setCanal("telefone")}
+                      icon={<Phone className="w-4 h-4" />}
+                      label="Ligar"
+                      className="border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    />
+                    <AcaoCanal
+                      href={emailHref}
+                      onClick={() => setCanal("email")}
+                      icon={<Mail className="w-4 h-4" />}
+                      label="E-mail"
+                      className="border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100"
+                    />
+                  </div>
+                  <p className="mt-2 text-[11px] text-muted-foreground">
+                    Abre o canal com a mensagem sugerida já preenchida. Depois,
+                    registre o contato abaixo.
+                  </p>
+                </section>
+
+                {/* Registrar contato */}
+                <section className="rounded-xl border bg-card p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <SectionLabel>Registrar contato</SectionLabel>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-7 text-xs gap-1"
+                      onClick={aplicarSugestao}
+                    >
+                      <Sparkles className="w-3.5 h-3.5" /> Sugerir mensagem
+                    </Button>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-3">
+                    <CampoSelect label="Canal">
+                      <Select
+                        value={canal}
+                        onValueChange={v => setCanal(v as AtendimentoCanal)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ATENDIMENTO_CANAIS.map(c => (
+                            <SelectItem key={c} value={c}>
+                              {CANAL_LABEL[c]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </CampoSelect>
+                    <CampoSelect label="Resultado">
+                      <Select
+                        value={tipo}
+                        onValueChange={v => setTipo(v as AtendimentoTipo)}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {ATENDIMENTO_TIPOS.map(t => (
+                            <SelectItem key={t} value={t}>
+                              {TIPO_LABEL[t]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </CampoSelect>
+                    <CampoSelect label="Mover para">
+                      <Select
+                        value={novaEtapa || NENHUMA}
+                        onValueChange={v =>
+                          setNovaEtapa(v === NENHUMA ? "" : v)
+                        }
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Mover etapa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={NENHUMA}>Manter etapa</SelectItem>
+                          {ATENDIMENTO_ETAPAS.map(et => (
+                            <SelectItem key={et} value={et}>
+                              {ETAPA_LABEL[et]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </CampoSelect>
+                  </div>
                   <div className="space-y-1">
                     <label className="text-[11px] text-muted-foreground">
                       Mensagem
                     </label>
                     <Textarea
-                      rows={canal === "email" ? 9 : 6}
+                      rows={5}
                       value={mensagem}
                       onChange={e => setMensagem(e.target.value)}
                       placeholder="Cole a mensagem enviada ou anote o resumo do contato..."
                     />
                   </div>
-                  <div className="space-y-1">
-                    <label className="text-[11px] text-muted-foreground">
-                      Como o prestador vai receber · {CANAL_LABEL[canal]}
-                    </label>
-                    <PreviewMensagem
-                      canal={canal}
-                      texto={mensagem}
-                      assunto={assuntoEmail(oficina.nomeFantasia)}
-                      paraEmail={oficina.email}
-                    />
+                  <div className="mt-4 flex flex-wrap items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="gap-2"
+                      disabled={!mensagem.trim()}
+                      onClick={() => setPreviewOpen(true)}
+                    >
+                      <Eye className="h-4 w-4" />
+                      Ver como o prestador recebe
+                    </Button>
+                    <Button
+                      onClick={enviar}
+                      disabled={registrar.isPending}
+                      className="gap-2"
+                    >
+                      {registrar.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Send className="w-4 h-4" />
+                      )}
+                      Registrar contato
+                    </Button>
                   </div>
-                </div>
-                <div className="flex justify-end mt-4">
-                  <Button
-                    onClick={enviar}
-                    disabled={registrar.isPending}
-                    className="gap-2"
-                  >
-                    {registrar.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Send className="w-4 h-4" />
-                    )}
-                    Registrar contato
-                  </Button>
-                </div>
-              </section>
+                </section>
 
-              {/* Linha do tempo */}
-              <section>
-                <SectionLabel className="mb-3">
-                  Linha do tempo ({eventos.length})
-                </SectionLabel>
-                {eventos.length === 0 ? (
-                  <div className="rounded-xl border border-dashed py-8 text-center">
-                    <StickyNote className="w-6 h-6 mx-auto text-muted-foreground/50 mb-2" />
-                    <p className="text-sm text-muted-foreground">
-                      Nenhum contato registrado ainda.
-                    </p>
-                    <p className="text-xs text-muted-foreground/70 mt-0.5">
-                      Use os botões acima para iniciar a conversa.
-                    </p>
-                  </div>
-                ) : (
-                  <ol className="relative space-y-4 pl-6 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-border">
-                    {eventos.map(ev => (
-                      <li key={ev.id} className="relative">
-                        <span className="absolute -left-[22px] top-1 w-3.5 h-3.5 rounded-full bg-background border-2 border-primary" />
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge variant="outline" className="text-[10px]">
-                            {CANAL_LABEL[ev.canal as AtendimentoCanal] ??
-                              ev.canal}
-                          </Badge>
-                          <Badge variant="secondary" className="text-[10px]">
-                            {TIPO_LABEL[ev.tipo as AtendimentoTipo] ?? ev.tipo}
-                          </Badge>
-                          {ev.etapaNova && (
-                            <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
-                              →{" "}
-                              {ETAPA_LABEL[ev.etapaNova as AtendimentoEtapa] ??
-                                ev.etapaNova}
+                {/* Linha do tempo */}
+                <section>
+                  <SectionLabel className="mb-3">
+                    Linha do tempo ({eventos.length})
+                  </SectionLabel>
+                  {eventos.length === 0 ? (
+                    <div className="rounded-xl border border-dashed py-8 text-center">
+                      <StickyNote className="w-6 h-6 mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">
+                        Nenhum contato registrado ainda.
+                      </p>
+                      <p className="text-xs text-muted-foreground/70 mt-0.5">
+                        Use os botões acima para iniciar a conversa.
+                      </p>
+                    </div>
+                  ) : (
+                    <ol className="relative space-y-4 pl-6 before:absolute before:left-[7px] before:top-1 before:bottom-1 before:w-px before:bg-border">
+                      {eventos.map(ev => (
+                        <li key={ev.id} className="relative">
+                          <span className="absolute -left-[22px] top-1 w-3.5 h-3.5 rounded-full bg-background border-2 border-primary" />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Badge variant="outline" className="text-[10px]">
+                              {CANAL_LABEL[ev.canal as AtendimentoCanal] ??
+                                ev.canal}
                             </Badge>
+                            <Badge variant="secondary" className="text-[10px]">
+                              {TIPO_LABEL[ev.tipo as AtendimentoTipo] ??
+                                ev.tipo}
+                            </Badge>
+                            {ev.etapaNova && (
+                              <Badge className="bg-primary/10 text-primary border-0 text-[10px]">
+                                →{" "}
+                                {ETAPA_LABEL[
+                                  ev.etapaNova as AtendimentoEtapa
+                                ] ?? ev.etapaNova}
+                              </Badge>
+                            )}
+                            <span className="text-[11px] text-muted-foreground ml-auto">
+                              {new Date(ev.createdAt).toLocaleString("pt-BR", {
+                                day: "2-digit",
+                                month: "2-digit",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          {ev.mensagem && (
+                            <p className="text-sm mt-1.5 whitespace-pre-wrap text-foreground/90">
+                              {ev.mensagem}
+                            </p>
                           )}
-                          <span className="text-[11px] text-muted-foreground ml-auto">
-                            {new Date(ev.createdAt).toLocaleString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                        {ev.mensagem && (
-                          <p className="text-sm mt-1.5 whitespace-pre-wrap text-foreground/90">
-                            {ev.mensagem}
-                          </p>
-                        )}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </section>
-            </div>
-          </>
-        )}
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {oficina && (
+        <PreviewDialog
+          open={previewOpen}
+          onClose={() => setPreviewOpen(false)}
+          canal={canal}
+          texto={mensagem}
+          assunto={assuntoEmail(oficina.nomeFantasia)}
+          paraEmail={oficina.email}
+        />
+      )}
+    </>
+  );
+}
+
+function PreviewDialog({
+  open,
+  onClose,
+  canal,
+  texto,
+  assunto,
+  paraEmail,
+}: {
+  open: boolean;
+  onClose: () => void;
+  canal: AtendimentoCanal;
+  texto: string;
+  assunto: string;
+  paraEmail: string | null;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={o => !o && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="text-base">
+            Como o prestador vai receber
+          </DialogTitle>
+          <p className="text-sm text-muted-foreground">
+            Pré-visualização no canal {CANAL_LABEL[canal]}.
+          </p>
+        </DialogHeader>
+        <div className="mt-1">
+          <PreviewMensagem
+            canal={canal}
+            texto={texto}
+            assunto={assunto}
+            paraEmail={paraEmail}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );
