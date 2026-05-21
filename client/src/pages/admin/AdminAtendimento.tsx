@@ -31,6 +31,7 @@ import {
   MessageCircle,
   StickyNote,
   Check,
+  ChevronLeft,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
@@ -586,13 +587,31 @@ function ProspectDialog({
                     </Select>
                   </CampoSelect>
                 </div>
-                <Textarea
-                  rows={4}
-                  value={mensagem}
-                  onChange={e => setMensagem(e.target.value)}
-                  placeholder="Cole a mensagem enviada ou anote o resumo do contato..."
-                />
-                <div className="flex justify-end mt-3">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground">
+                      Mensagem
+                    </label>
+                    <Textarea
+                      rows={canal === "email" ? 9 : 6}
+                      value={mensagem}
+                      onChange={e => setMensagem(e.target.value)}
+                      placeholder="Cole a mensagem enviada ou anote o resumo do contato..."
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[11px] text-muted-foreground">
+                      Como o prestador vai receber · {CANAL_LABEL[canal]}
+                    </label>
+                    <PreviewMensagem
+                      canal={canal}
+                      texto={mensagem}
+                      assunto={assuntoEmail(oficina.nomeFantasia)}
+                      paraEmail={oficina.email}
+                    />
+                  </div>
+                </div>
+                <div className="flex justify-end mt-4">
                   <Button
                     onClick={enviar}
                     disabled={registrar.isPending}
@@ -734,5 +753,141 @@ function AcaoCanal({
       {icon}
       <span className="text-xs">{label}</span>
     </a>
+  );
+}
+
+function PreviewMensagem({
+  canal,
+  texto,
+  assunto,
+  paraEmail,
+}: {
+  canal: AtendimentoCanal;
+  texto: string;
+  assunto: string;
+  paraEmail: string | null;
+}) {
+  if (!texto.trim()) {
+    return (
+      <div className="flex h-full min-h-[120px] items-center justify-center rounded-xl border border-dashed px-4 py-8 text-center">
+        <p className="text-xs text-muted-foreground">
+          A prévia aparece aqui. Clique em{" "}
+          <span className="font-medium">Sugerir mensagem</span> ou comece a
+          escrever.
+        </p>
+      </div>
+    );
+  }
+  if (canal === "whatsapp") return <PreviewWhatsApp texto={texto} />;
+  if (canal === "email")
+    return <PreviewEmail assunto={assunto} corpo={texto} para={paraEmail} />;
+  if (canal === "sms") return <PreviewSms texto={texto} />;
+  return <PreviewNota texto={texto} />;
+}
+
+function PreviewWhatsApp({ texto }: { texto: string }) {
+  const hora = new Date().toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  return (
+    <div className="overflow-hidden rounded-xl border shadow-sm">
+      <div className="flex items-center gap-2 bg-[#075E54] px-3 py-2 text-white">
+        <ChevronLeft className="h-4 w-4 opacity-80" />
+        <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white/20 text-[11px] font-bold">
+          GO
+        </div>
+        <div className="leading-tight">
+          <div className="text-sm font-medium">GO SERVICE</div>
+          <div className="text-[10px] text-white/70">online</div>
+        </div>
+      </div>
+      <div className="min-h-[120px] bg-[#ECE5DD] px-3 py-4">
+        <div className="max-w-[88%] rounded-lg rounded-tl-sm bg-white px-2.5 py-1.5 shadow-sm">
+          <p className="whitespace-pre-wrap text-[13px] leading-snug text-gray-800">
+            {texto}
+          </p>
+          <div className="mt-0.5 text-right text-[10px] text-gray-400">
+            {hora}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewSms({ texto }: { texto: string }) {
+  return (
+    <div className="overflow-hidden rounded-xl border shadow-sm">
+      <div className="bg-muted px-3 py-2 text-center text-[11px] font-medium text-muted-foreground">
+        SMS · GO SERVICE
+      </div>
+      <div className="min-h-[100px] bg-background px-3 py-4">
+        <div className="max-w-[88%] rounded-2xl rounded-bl-sm bg-muted px-3 py-2">
+          <p className="whitespace-pre-wrap text-[13px] text-foreground">
+            {texto}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PreviewNota({ texto }: { texto: string }) {
+  return (
+    <div className="min-h-[120px] rounded-xl border bg-muted/30 px-4 py-3">
+      <p className="whitespace-pre-wrap text-sm text-foreground/90">{texto}</p>
+    </div>
+  );
+}
+
+function PreviewEmail({
+  assunto,
+  corpo,
+  para,
+}: {
+  assunto: string;
+  corpo: string;
+  para: string | null;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border bg-white shadow-sm">
+      <div className="space-y-0.5 border-b bg-muted/40 px-4 py-2.5 text-xs">
+        <div>
+          <span className="text-muted-foreground">De: </span>
+          <span className="font-medium">GO SERVICE</span>{" "}
+          <span className="text-muted-foreground">
+            &lt;parcerias@goservice.com.br&gt;
+          </span>
+        </div>
+        <div className="truncate">
+          <span className="text-muted-foreground">Para: </span>
+          {para || "contato do prestador"}
+        </div>
+        <div className="pt-0.5 text-sm font-semibold">{assunto}</div>
+      </div>
+      <div className="bg-primary px-6 py-5 text-center text-white">
+        <div className="text-lg font-bold tracking-wide">GO SERVICE</div>
+        <div className="text-[11px] text-white/80">
+          Rede multissegmento de prestadores credenciados
+        </div>
+      </div>
+      <div className="px-6 py-5">
+        <p className="whitespace-pre-wrap text-sm leading-relaxed text-gray-700">
+          {corpo}
+        </p>
+        <div className="mt-5">
+          <span className="inline-block rounded-md bg-primary px-4 py-2 text-sm font-medium text-white">
+            Quero credenciar minha unidade
+          </span>
+        </div>
+      </div>
+      <div className="border-t bg-muted/30 px-6 py-4 text-[11px] leading-relaxed text-muted-foreground">
+        GO SERVICE • Rede de prestadores credenciados
+        <br />
+        Você recebeu este e-mail porque seu estabelecimento foi identificado
+        como potencial parceiro da rede.
+      </div>
+    </div>
   );
 }
