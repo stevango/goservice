@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1779091136402,
+      "tag": "0000_remarkable_abomination",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1779091772275,
+      "tag": "0001_swift_peter_parker",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1779109119996,
+      "tag": "0002_colorful_vance_astro",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1779110992192,
+      "tag": "0003_typical_mysterio",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1779152059833,
+      "tag": "0004_slimy_thunderbolt_ross",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1779153330545,
+      "tag": "0005_real_hemingway",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1779305473912,
+      "tag": "0006_ambiguous_spiral",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1779388927302,
+      "tag": "0007_yielding_mantis",
+      "breakpoints": true
+    }
+  ]
+}

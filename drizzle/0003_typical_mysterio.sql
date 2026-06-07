@@ -1,0 +1,1 @@
+ALTER TABLE `import_jobs` ADD `limite` int DEFAULT 60 NOT NULL;
