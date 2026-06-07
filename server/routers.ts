@@ -6,6 +6,7 @@ import {
   ATENDIMENTO_ETAPAS,
   ETAPA_LABEL,
   proximaEtapaEsteira,
+  REPASSE_STATUS,
 } from "@shared/types";
 import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
@@ -875,6 +876,96 @@ export const appRouter = router({
         });
         return { ok: true };
       }),
+  }),
+
+  // ==================== FINANCEIRO ====================
+  financeiro: router({
+    repasses: router({
+      listar: adminProcedure
+        .input(
+          z
+            .object({
+              status: z
+                .enum(REPASSE_STATUS as unknown as [string, ...string[]])
+                .optional(),
+              oficinaId: z.number().optional(),
+              search: z.string().optional(),
+            })
+            .optional()
+        )
+        .query(async ({ input }) => {
+          return db.listRepasses(input ?? {}, 200);
+        }),
+
+      criar: adminProcedure
+        .input(
+          z.object({
+            oficinaId: z.number(),
+            valor: z.number().positive(),
+            descricao: z.string().min(3).max(500),
+            referencia: z.string().max(80).optional(),
+            observacoes: z.string().max(2000).optional(),
+            status: z
+              .enum(REPASSE_STATUS as unknown as [string, ...string[]])
+              .optional(),
+          })
+        )
+        .mutation(async ({ ctx, input }) => {
+          const oficina = await db.getOficinaById(input.oficinaId);
+          if (!oficina)
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Prestador não encontrado.",
+            });
+          const id = await db.createRepasse({
+            oficinaId: input.oficinaId,
+            valor: input.valor.toFixed(2),
+            descricao: input.descricao,
+            referencia: input.referencia ?? null,
+            observacoes: input.observacoes ?? null,
+            status:
+              (input.status as
+                | "pendente"
+                | "aprovado"
+                | "pago"
+                | "cancelado") ?? "pendente",
+            criadoPorUserId: ctx.user?.id,
+          });
+          return { id };
+        }),
+
+      alterarStatus: adminProcedure
+        .input(
+          z.object({
+            id: z.number(),
+            status: z.enum(REPASSE_STATUS as unknown as [string, ...string[]]),
+            observacoes: z.string().max(2000).optional(),
+          })
+        )
+        .mutation(async ({ input }) => {
+          const r = await db.getRepasseById(input.id);
+          if (!r)
+            throw new TRPCError({
+              code: "NOT_FOUND",
+              message: "Repasse não encontrado.",
+            });
+          await db.updateRepasseStatus(
+            input.id,
+            input.status as "pendente" | "aprovado" | "pago" | "cancelado",
+            input.observacoes
+          );
+          return { ok: true };
+        }),
+
+      metricas: adminProcedure.query(async () => {
+        return db.metricasRepasses();
+      }),
+    }),
+
+    // Helper compartilhado: lista enxuta de prestadores para selects.
+    oficinasParaSelect: adminProcedure.query(async () => {
+      return db.listOficinasParaSelect();
+    }),
   }),
 });
 

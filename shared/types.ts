@@ -412,6 +412,43 @@ export const FORNECE_PECAS_OPTIONS = [
 ] as const;
 
 // ============================================================
+// FINANCEIRO — REPASSES
+// ============================================================
+
+export const REPASSE_STATUS = [
+  "pendente",
+  "aprovado",
+  "pago",
+  "cancelado",
+] as const;
+export type RepasseStatus = (typeof REPASSE_STATUS)[number];
+
+export const REPASSE_STATUS_LABEL: Record<RepasseStatus, string> = {
+  pendente: "Pendente",
+  aprovado: "Aprovado",
+  pago: "Pago",
+  cancelado: "Cancelado",
+};
+
+// Cor (Tailwind) de cada status para badges/indicadores. Mantém
+// consistência visual entre tela, KPIs e relatórios.
+export const REPASSE_STATUS_COR: Record<RepasseStatus, string> = {
+  pendente: "bg-amber-50 text-amber-700 border-amber-200",
+  aprovado: "bg-blue-50 text-blue-700 border-blue-200",
+  pago: "bg-green-50 text-green-700 border-green-200",
+  cancelado: "bg-slate-100 text-slate-600 border-slate-200",
+};
+
+export function formatarBRL(valor: number | string | null | undefined): string {
+  const n = typeof valor === "string" ? Number(valor) : (valor ?? 0);
+  if (!Number.isFinite(n)) return "R$ 0,00";
+  return n.toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
+}
+
+// ============================================================
 // CENTRO DE CONVERSÃO DE PARCEIROS (Atendimento / CRM)
 // ============================================================
 

@@ -7,8 +7,11 @@ import {
   Eye,
   CheckCircle2,
   TrendingUp,
+  Hourglass,
+  Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { formatarBRL } from "@shared/types";
 
 // Primeira tela "ao vivo" da área Investidor: consome as métricas do
 // Centro de Conversão (PDCA) e apresenta os indicadores-chave para
@@ -18,7 +21,11 @@ export default function AdminInvestidorKpis() {
   const q = trpc.atendimento.metricas.useQuery(undefined, {
     refetchInterval: 60_000,
   });
+  const qFin = trpc.financeiro.repasses.metricas.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
   const m = q.data;
+  const f = qFin.data;
 
   const pct = (n: number, total: number) =>
     total > 0 ? `${Math.round((n / total) * 100)}%` : "—";
@@ -89,9 +96,41 @@ export default function AdminInvestidorKpis() {
             </div>
           </section>
 
+          <section className="mb-8">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              Financeiro
+            </h2>
+            {qFin.isLoading || !f ? (
+              <div className="h-24 rounded-xl border bg-card animate-pulse" />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                <Kpi
+                  icon={Hourglass}
+                  label="A pagar aos prestadores"
+                  valor={formatarBRL(f.totalPendente + f.totalAprovado)}
+                  hint={`${f.countPendente + f.countAprovado} repasse(s) aguardando pagamento.`}
+                  accent="text-amber-600"
+                />
+                <Kpi
+                  icon={Wallet}
+                  label="Pago no mês"
+                  valor={formatarBRL(f.totalPagoMes)}
+                  hint={`${f.countPagoMes} pagamento(s) liquidado(s) este mês.`}
+                  accent="text-green-600"
+                />
+                <Kpi
+                  icon={TrendingUp}
+                  label="Pago acumulado"
+                  valor={formatarBRL(f.totalPagoGeral)}
+                  hint="Total repassado à rede desde o início."
+                />
+              </div>
+            )}
+          </section>
+
           <div className="rounded-xl border border-dashed bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
             Próximas famílias de KPIs (em construção): receita recorrente, CAC,
-            LTV, payback, retenção por coorte e growth do funil B2B.
+            LTV, payback e retenção por coorte.
           </div>
         </>
       )}
@@ -108,10 +147,12 @@ function Kpi({
 }: {
   icon: LucideIcon;
   label: string;
-  valor: number;
+  valor: number | string;
   hint: string;
   accent?: string;
 }) {
+  const display =
+    typeof valor === "number" ? valor.toLocaleString("pt-BR") : valor;
   return (
     <div className="rounded-xl border bg-card p-5">
       <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
@@ -119,7 +160,7 @@ function Kpi({
         {label}
       </div>
       <div className={`mt-1 text-3xl font-bold leading-tight ${accent}`}>
-        {valor.toLocaleString("pt-BR")}
+        {display}
       </div>
       <p className="mt-1 text-xs text-muted-foreground leading-snug">{hint}</p>
     </div>

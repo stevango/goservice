@@ -1,4 +1,15 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, decimal, boolean, json, index } from "drizzle-orm/mysql-core";
+import {
+  int,
+  mysqlEnum,
+  mysqlTable,
+  text,
+  timestamp,
+  varchar,
+  decimal,
+  boolean,
+  json,
+  index,
+} from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -10,7 +21,9 @@ export const users = mysqlTable("users", {
   email: varchar("email", { length: 320 }),
   loginMethod: varchar("loginMethod", { length: 64 }),
   passwordHash: varchar("passwordHash", { length: 255 }),
-  role: mysqlEnum("role", ["user", "admin", "oficina", "b2b"]).default("user").notNull(),
+  role: mysqlEnum("role", ["user", "admin", "oficina", "b2b"])
+    .default("user")
+    .notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
@@ -22,122 +35,161 @@ export type InsertUser = typeof users.$inferInsert;
 /**
  * Oficinas - tabela principal
  */
-export const oficinas = mysqlTable("oficinas", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId"),
-  
-  // Dados cadastrais
-  cnpj: varchar("cnpj", { length: 18 }).notNull(),
-  razaoSocial: varchar("razaoSocial", { length: 255 }).notNull(),
-  nomeFantasia: varchar("nomeFantasia", { length: 255 }).notNull(),
-  telefone: varchar("telefone", { length: 20 }),
-  whatsapp: varchar("whatsapp", { length: 20 }),
-  email: varchar("email", { length: 320 }),
-  website: varchar("website", { length: 500 }),
-  
-  // Representante
-  nomeRepresentante: varchar("nomeRepresentante", { length: 255 }),
-  cpfRepresentante: varchar("cpfRepresentante", { length: 14 }),
-  rgRepresentante: varchar("rgRepresentante", { length: 20 }),
-  
-  // Endereço
-  cep: varchar("cep", { length: 9 }),
-  logradouro: varchar("logradouro", { length: 500 }),
-  numero: varchar("numero", { length: 20 }),
-  complemento: varchar("complemento", { length: 255 }),
-  bairro: varchar("bairro", { length: 255 }),
-  cidade: varchar("cidade", { length: 255 }),
-  estado: varchar("estado", { length: 2 }),
-  latitude: decimal("latitude", { precision: 10, scale: 7 }),
-  longitude: decimal("longitude", { precision: 10, scale: 7 }),
-  
-  // Dados bancários
-  banco: varchar("banco", { length: 100 }),
-  agencia: varchar("agencia", { length: 20 }),
-  contaCorrente: varchar("contaCorrente", { length: 30 }),
-  pixTipo: mysqlEnum("pixTipo", ["cpf", "cnpj", "telefone", "email", "chave_aleatoria"]),
-  pixChave: varchar("pixChave", { length: 255 }),
-  
-  // Classificação
-  segmento: varchar("segmento", { length: 64 }).default("oficina_mecanica").notNull(),
-  categoria: mysqlEnum("categoria", ["premium", "concessionaria", "padrao"]).default("padrao").notNull(),
-  
-  // Tipos de veículos (JSON array)
-  tiposVeiculos: json("tiposVeiculos").$type<string[]>(),
-  
-  // Tipos de serviços (JSON array)
-  tiposServicos: json("tiposServicos").$type<string[]>(),
-  
-  // Informações comerciais
-  franquiaAntes: boolean("franquiaAntes").default(false),
-  franquiaDepois: boolean("franquiaDepois").default(true),
-  parcelamentoFranquia: int("parcelamentoFranquia").default(1),
-  fornecePecas: mysqlEnum("fornecePecas", ["oficina", "seguradora", "cliente", "ambos"]).default("oficina"),
-  garantiaServico: varchar("garantiaServico", { length: 255 }),
-  
-  // Descrição e horários
-  descricao: text("descricao"),
-  horarioFuncionamento: text("horarioFuncionamento"),
-  
-  // Reputação
-  scoreReputacao: decimal("scoreReputacao", { precision: 3, scale: 1 }).default("0.0"),
-  totalAvaliacoes: int("totalAvaliacoes").default(0),
+export const oficinas = mysqlTable(
+  "oficinas",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId"),
 
-  // Enriquecimento via Google Places: NULL = ainda precisa enriquecer.
-  enrichedAt: timestamp("enrichedAt"),
-  
-  // Status
-  status: mysqlEnum("status", ["pendente", "ativa", "bloqueada", "rejeitada"]).default("pendente").notNull(),
-  etapaCadastro: mysqlEnum("etapaCadastro", ["dados", "endereco", "documentos", "fotos", "contrato", "completo"]).default("dados"),
-  
-  // Observações internas (admin)
-  observacoesAdmin: text("observacoesAdmin"),
+    // Dados cadastrais
+    cnpj: varchar("cnpj", { length: 18 }).notNull(),
+    razaoSocial: varchar("razaoSocial", { length: 255 }).notNull(),
+    nomeFantasia: varchar("nomeFantasia", { length: 255 }).notNull(),
+    telefone: varchar("telefone", { length: 20 }),
+    whatsapp: varchar("whatsapp", { length: 20 }),
+    email: varchar("email", { length: 320 }),
+    website: varchar("website", { length: 500 }),
 
-  // Etapa atual no funil de conversão de parceiros (centro de conversão).
-  etapaAtendimento: mysqlEnum("etapaAtendimento", [
-    "lead_encontrado",
-    "convite_enviado",
-    "convite_entregue",
-    "visualizou",
-    "nao_respondeu",
-    "followup_1",
-    "followup_2",
-    "negociando",
-    "interesse_demonstrado",
-    "cadastro_iniciado",
-    "cadastro_concluido",
-    "ativado",
-    "operando",
-    "recusou",
-    "inativo",
-  ]).default("lead_encontrado").notNull(),
+    // Representante
+    nomeRepresentante: varchar("nomeRepresentante", { length: 255 }),
+    cpfRepresentante: varchar("cpfRepresentante", { length: 14 }),
+    rgRepresentante: varchar("rgRepresentante", { length: 20 }),
 
-  // Automação da esteira de conversão. Quando ativa, o worker reconvida
-  // o prestador na cadência definida até ele aceitar (clicar no CTA) ou
-  // ser marcado como fora do funil.
-  automacaoAtiva: boolean("automacaoAtiva").default(false).notNull(),
-  proximaAcaoAt: timestamp("proximaAcaoAt"),
-  ultimoContatoAt: timestamp("ultimoContatoAt"),
-  tentativasConvite: int("tentativasConvite").default(0).notNull(),
-  // Token do link rastreável da página do parceiro (CTA de credenciamento).
-  tokenParceiro: varchar("tokenParceiro", { length: 40 }),
+    // Endereço
+    cep: varchar("cep", { length: 9 }),
+    logradouro: varchar("logradouro", { length: 500 }),
+    numero: varchar("numero", { length: 20 }),
+    complemento: varchar("complemento", { length: 255 }),
+    bairro: varchar("bairro", { length: 255 }),
+    cidade: varchar("cidade", { length: 255 }),
+    estado: varchar("estado", { length: 2 }),
+    latitude: decimal("latitude", { precision: 10, scale: 7 }),
+    longitude: decimal("longitude", { precision: 10, scale: 7 }),
 
-  // Dedup de importação automática (Google Places)
-  googlePlaceId: varchar("googlePlaceId", { length: 128 }),
+    // Dados bancários
+    banco: varchar("banco", { length: 100 }),
+    agencia: varchar("agencia", { length: 20 }),
+    contaCorrente: varchar("contaCorrente", { length: 30 }),
+    pixTipo: mysqlEnum("pixTipo", [
+      "cpf",
+      "cnpj",
+      "telefone",
+      "email",
+      "chave_aleatoria",
+    ]),
+    pixChave: varchar("pixChave", { length: 255 }),
 
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (t) => ({
-  // Listagem pública/admin: filtra por status e ordena por reputação
-  statusScoreIdx: index("oficinas_status_score_idx").on(t.status, t.scoreReputacao),
-  userIdIdx: index("oficinas_user_id_idx").on(t.userId),
-  estadoIdx: index("oficinas_estado_idx").on(t.estado),
-  categoriaIdx: index("oficinas_categoria_idx").on(t.categoria),
-  googlePlaceIdIdx: index("oficinas_google_place_id_idx").on(t.googlePlaceId),
-  // Worker da automação: busca quem está com ação vencida.
-  automacaoIdx: index("oficinas_automacao_idx").on(t.automacaoAtiva, t.proximaAcaoAt),
-  tokenParceiroIdx: index("oficinas_token_parceiro_idx").on(t.tokenParceiro),
-}));
+    // Classificação
+    segmento: varchar("segmento", { length: 64 })
+      .default("oficina_mecanica")
+      .notNull(),
+    categoria: mysqlEnum("categoria", ["premium", "concessionaria", "padrao"])
+      .default("padrao")
+      .notNull(),
+
+    // Tipos de veículos (JSON array)
+    tiposVeiculos: json("tiposVeiculos").$type<string[]>(),
+
+    // Tipos de serviços (JSON array)
+    tiposServicos: json("tiposServicos").$type<string[]>(),
+
+    // Informações comerciais
+    franquiaAntes: boolean("franquiaAntes").default(false),
+    franquiaDepois: boolean("franquiaDepois").default(true),
+    parcelamentoFranquia: int("parcelamentoFranquia").default(1),
+    fornecePecas: mysqlEnum("fornecePecas", [
+      "oficina",
+      "seguradora",
+      "cliente",
+      "ambos",
+    ]).default("oficina"),
+    garantiaServico: varchar("garantiaServico", { length: 255 }),
+
+    // Descrição e horários
+    descricao: text("descricao"),
+    horarioFuncionamento: text("horarioFuncionamento"),
+
+    // Reputação
+    scoreReputacao: decimal("scoreReputacao", {
+      precision: 3,
+      scale: 1,
+    }).default("0.0"),
+    totalAvaliacoes: int("totalAvaliacoes").default(0),
+
+    // Enriquecimento via Google Places: NULL = ainda precisa enriquecer.
+    enrichedAt: timestamp("enrichedAt"),
+
+    // Status
+    status: mysqlEnum("status", ["pendente", "ativa", "bloqueada", "rejeitada"])
+      .default("pendente")
+      .notNull(),
+    etapaCadastro: mysqlEnum("etapaCadastro", [
+      "dados",
+      "endereco",
+      "documentos",
+      "fotos",
+      "contrato",
+      "completo",
+    ]).default("dados"),
+
+    // Observações internas (admin)
+    observacoesAdmin: text("observacoesAdmin"),
+
+    // Etapa atual no funil de conversão de parceiros (centro de conversão).
+    etapaAtendimento: mysqlEnum("etapaAtendimento", [
+      "lead_encontrado",
+      "convite_enviado",
+      "convite_entregue",
+      "visualizou",
+      "nao_respondeu",
+      "followup_1",
+      "followup_2",
+      "negociando",
+      "interesse_demonstrado",
+      "cadastro_iniciado",
+      "cadastro_concluido",
+      "ativado",
+      "operando",
+      "recusou",
+      "inativo",
+    ])
+      .default("lead_encontrado")
+      .notNull(),
+
+    // Automação da esteira de conversão. Quando ativa, o worker reconvida
+    // o prestador na cadência definida até ele aceitar (clicar no CTA) ou
+    // ser marcado como fora do funil.
+    automacaoAtiva: boolean("automacaoAtiva").default(false).notNull(),
+    proximaAcaoAt: timestamp("proximaAcaoAt"),
+    ultimoContatoAt: timestamp("ultimoContatoAt"),
+    tentativasConvite: int("tentativasConvite").default(0).notNull(),
+    // Token do link rastreável da página do parceiro (CTA de credenciamento).
+    tokenParceiro: varchar("tokenParceiro", { length: 40 }),
+
+    // Dedup de importação automática (Google Places)
+    googlePlaceId: varchar("googlePlaceId", { length: 128 }),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => ({
+    // Listagem pública/admin: filtra por status e ordena por reputação
+    statusScoreIdx: index("oficinas_status_score_idx").on(
+      t.status,
+      t.scoreReputacao
+    ),
+    userIdIdx: index("oficinas_user_id_idx").on(t.userId),
+    estadoIdx: index("oficinas_estado_idx").on(t.estado),
+    categoriaIdx: index("oficinas_categoria_idx").on(t.categoria),
+    googlePlaceIdIdx: index("oficinas_google_place_id_idx").on(t.googlePlaceId),
+    // Worker da automação: busca quem está com ação vencida.
+    automacaoIdx: index("oficinas_automacao_idx").on(
+      t.automacaoAtiva,
+      t.proximaAcaoAt
+    ),
+    tokenParceiroIdx: index("oficinas_token_parceiro_idx").on(t.tokenParceiro),
+  })
+);
 
 export type Oficina = typeof oficinas.$inferSelect;
 export type InsertOficina = typeof oficinas.$inferInsert;
@@ -145,16 +197,30 @@ export type InsertOficina = typeof oficinas.$inferInsert;
 /**
  * Documentos e fotos da oficina
  */
-export const oficinaDocumentos = mysqlTable("oficina_documentos", {
-  id: int("id").autoincrement().primaryKey(),
-  oficinaId: int("oficinaId").notNull(),
-  tipo: mysqlEnum("tipo", ["alvara", "cnpj_card", "contrato_social", "rg_frente", "rg_verso", "foto_fachada", "foto_interior", "foto_equipamentos", "outro"]).notNull(),
-  url: varchar("url", { length: 1000 }).notNull(),
-  nome: varchar("nome", { length: 255 }),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => ({
-  oficinaIdIdx: index("oficina_documentos_oficina_id_idx").on(t.oficinaId),
-}));
+export const oficinaDocumentos = mysqlTable(
+  "oficina_documentos",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    oficinaId: int("oficinaId").notNull(),
+    tipo: mysqlEnum("tipo", [
+      "alvara",
+      "cnpj_card",
+      "contrato_social",
+      "rg_frente",
+      "rg_verso",
+      "foto_fachada",
+      "foto_interior",
+      "foto_equipamentos",
+      "outro",
+    ]).notNull(),
+    url: varchar("url", { length: 1000 }).notNull(),
+    nome: varchar("nome", { length: 255 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => ({
+    oficinaIdIdx: index("oficina_documentos_oficina_id_idx").on(t.oficinaId),
+  })
+);
 
 export type OficinaDocumento = typeof oficinaDocumentos.$inferSelect;
 export type InsertOficinaDocumento = typeof oficinaDocumentos.$inferInsert;
@@ -162,34 +228,46 @@ export type InsertOficinaDocumento = typeof oficinaDocumentos.$inferInsert;
 /**
  * Avaliações de clientes
  */
-export const avaliacoes = mysqlTable("avaliacoes", {
-  id: int("id").autoincrement().primaryKey(),
-  oficinaId: int("oficinaId").notNull(),
-  userId: int("userId"),
-  
-  // Notas (1-5)
-  notaGeral: int("notaGeral").notNull(),
-  notaAtendimento: int("notaAtendimento"),
-  notaQualidade: int("notaQualidade"),
-  notaPrazo: int("notaPrazo"),
-  notaPreco: int("notaPreco"),
-  
-  comentario: text("comentario"),
-  nomeCliente: varchar("nomeCliente", { length: 255 }),
-  
-  // Dados do serviço
-  tipoServico: varchar("tipoServico", { length: 100 }),
-  tipoVeiculo: varchar("tipoVeiculo", { length: 100 }),
-  
-  status: mysqlEnum("statusAvaliacao", ["pendente", "aprovada", "rejeitada"]).default("pendente").notNull(),
+export const avaliacoes = mysqlTable(
+  "avaliacoes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    oficinaId: int("oficinaId").notNull(),
+    userId: int("userId"),
 
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => ({
-  // listAvaliacoes / recalcularScore filtram por oficina (+status)
-  oficinaStatusIdx: index("avaliacoes_oficina_status_idx").on(t.oficinaId, t.status),
-  // listAllAvaliacoes: filtra por status e ordena por data
-  statusCreatedIdx: index("avaliacoes_status_created_idx").on(t.status, t.createdAt),
-}));
+    // Notas (1-5)
+    notaGeral: int("notaGeral").notNull(),
+    notaAtendimento: int("notaAtendimento"),
+    notaQualidade: int("notaQualidade"),
+    notaPrazo: int("notaPrazo"),
+    notaPreco: int("notaPreco"),
+
+    comentario: text("comentario"),
+    nomeCliente: varchar("nomeCliente", { length: 255 }),
+
+    // Dados do serviço
+    tipoServico: varchar("tipoServico", { length: 100 }),
+    tipoVeiculo: varchar("tipoVeiculo", { length: 100 }),
+
+    status: mysqlEnum("statusAvaliacao", ["pendente", "aprovada", "rejeitada"])
+      .default("pendente")
+      .notNull(),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => ({
+    // listAvaliacoes / recalcularScore filtram por oficina (+status)
+    oficinaStatusIdx: index("avaliacoes_oficina_status_idx").on(
+      t.oficinaId,
+      t.status
+    ),
+    // listAllAvaliacoes: filtra por status e ordena por data
+    statusCreatedIdx: index("avaliacoes_status_created_idx").on(
+      t.status,
+      t.createdAt
+    ),
+  })
+);
 
 export type Avaliacao = typeof avaliacoes.$inferSelect;
 export type InsertAvaliacao = typeof avaliacoes.$inferInsert;
@@ -197,26 +275,34 @@ export type InsertAvaliacao = typeof avaliacoes.$inferInsert;
 /**
  * Clientes B2B (Seguradoras e Associações)
  */
-export const clientesB2B = mysqlTable("clientes_b2b", {
-  id: int("id").autoincrement().primaryKey(),
-  userId: int("userId"),
-  
-  razaoSocial: varchar("razaoSocial", { length: 255 }).notNull(),
-  nomeFantasia: varchar("nomeFantasia", { length: 255 }).notNull(),
-  cnpj: varchar("cnpj", { length: 18 }).notNull(),
-  tipo: mysqlEnum("tipo", ["seguradora", "associacao", "cooperativa"]).default("seguradora").notNull(),
-  
-  contatoNome: varchar("contatoNome", { length: 255 }),
-  contatoEmail: varchar("contatoEmail", { length: 320 }),
-  contatoTelefone: varchar("contatoTelefone", { length: 20 }),
-  
-  status: mysqlEnum("statusB2B", ["ativo", "inativo", "pendente"]).default("pendente").notNull(),
-  
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (t) => ({
-  userIdIdx: index("clientes_b2b_user_id_idx").on(t.userId),
-}));
+export const clientesB2B = mysqlTable(
+  "clientes_b2b",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId"),
+
+    razaoSocial: varchar("razaoSocial", { length: 255 }).notNull(),
+    nomeFantasia: varchar("nomeFantasia", { length: 255 }).notNull(),
+    cnpj: varchar("cnpj", { length: 18 }).notNull(),
+    tipo: mysqlEnum("tipo", ["seguradora", "associacao", "cooperativa"])
+      .default("seguradora")
+      .notNull(),
+
+    contatoNome: varchar("contatoNome", { length: 255 }),
+    contatoEmail: varchar("contatoEmail", { length: 320 }),
+    contatoTelefone: varchar("contatoTelefone", { length: 20 }),
+
+    status: mysqlEnum("statusB2B", ["ativo", "inativo", "pendente"])
+      .default("pendente")
+      .notNull(),
+
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => ({
+    userIdIdx: index("clientes_b2b_user_id_idx").on(t.userId),
+  })
+);
 
 export type ClienteB2B = typeof clientesB2B.$inferSelect;
 export type InsertClienteB2B = typeof clientesB2B.$inferInsert;
@@ -224,18 +310,30 @@ export type InsertClienteB2B = typeof clientesB2B.$inferInsert;
 /**
  * Notificações do sistema
  */
-export const notificacoes = mysqlTable("notificacoes", {
-  id: int("id").autoincrement().primaryKey(),
-  tipo: mysqlEnum("tipoNotificacao", ["novo_cadastro", "nova_avaliacao", "status_alterado", "documento_enviado"]).notNull(),
-  titulo: varchar("titulo", { length: 255 }).notNull(),
-  mensagem: text("mensagem"),
-  lida: boolean("lida").default(false),
-  dados: json("dados").$type<Record<string, unknown>>(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => ({
-  // Listagem por data e contagem de não lidas
-  lidaCreatedIdx: index("notificacoes_lida_created_idx").on(t.lida, t.createdAt),
-}));
+export const notificacoes = mysqlTable(
+  "notificacoes",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    tipo: mysqlEnum("tipoNotificacao", [
+      "novo_cadastro",
+      "nova_avaliacao",
+      "status_alterado",
+      "documento_enviado",
+    ]).notNull(),
+    titulo: varchar("titulo", { length: 255 }).notNull(),
+    mensagem: text("mensagem"),
+    lida: boolean("lida").default(false),
+    dados: json("dados").$type<Record<string, unknown>>(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => ({
+    // Listagem por data e contagem de não lidas
+    lidaCreatedIdx: index("notificacoes_lida_created_idx").on(
+      t.lida,
+      t.createdAt
+    ),
+  })
+);
 
 export type Notificacao = typeof notificacoes.$inferSelect;
 export type InsertNotificacao = typeof notificacoes.$inferInsert;
@@ -244,49 +342,55 @@ export type InsertNotificacao = typeof notificacoes.$inferInsert;
  * Importação automática de oficinas (Google Places).
  * Cada job é processado devagar, em lotes, de forma retomável.
  */
-export const importJobs = mysqlTable("import_jobs", {
-  id: int("id").autoincrement().primaryKey(),
-  termo: varchar("termo", { length: 255 }).notNull(),
-  segmento: varchar("segmento", { length: 64 }).default("oficina_mecanica").notNull(),
-  cidade: varchar("cidade", { length: 255 }).notNull(),
-  estado: varchar("estado", { length: 2 }).notNull(),
-  status: mysqlEnum("statusImport", [
-    "pendente",
-    "rodando",
-    "concluido",
-    "cancelado",
-    "erro",
-  ])
-    .default("pendente")
-    .notNull(),
-  limite: int("limite").default(60).notNull(),
-  // Worker em 2 fases: coleta todas as páginas, ranqueia por avaliação,
-  // depois insere os melhores primeiro.
-  fase: mysqlEnum("faseImport", ["coletando", "inserindo"])
-    .default("coletando")
-    .notNull(),
-  candidatos: json("candidatos").$type<
-    Array<{
-      placeId: string;
-      nome: string;
-      rating: number;
-      urt: number;
-      lat?: number;
-      lng?: number;
-      endereco?: string;
-    }>
-  >(),
-  nextPageToken: text("nextPageToken"),
-  pagina: int("pagina").default(0).notNull(),
-  encontrados: int("encontrados").default(0).notNull(),
-  importados: int("importados").default(0).notNull(),
-  duplicados: int("duplicados").default(0).notNull(),
-  erro: text("erro"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
-}, (t) => ({
-  statusIdx: index("import_jobs_status_idx").on(t.status),
-}));
+export const importJobs = mysqlTable(
+  "import_jobs",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    termo: varchar("termo", { length: 255 }).notNull(),
+    segmento: varchar("segmento", { length: 64 })
+      .default("oficina_mecanica")
+      .notNull(),
+    cidade: varchar("cidade", { length: 255 }).notNull(),
+    estado: varchar("estado", { length: 2 }).notNull(),
+    status: mysqlEnum("statusImport", [
+      "pendente",
+      "rodando",
+      "concluido",
+      "cancelado",
+      "erro",
+    ])
+      .default("pendente")
+      .notNull(),
+    limite: int("limite").default(60).notNull(),
+    // Worker em 2 fases: coleta todas as páginas, ranqueia por avaliação,
+    // depois insere os melhores primeiro.
+    fase: mysqlEnum("faseImport", ["coletando", "inserindo"])
+      .default("coletando")
+      .notNull(),
+    candidatos: json("candidatos").$type<
+      Array<{
+        placeId: string;
+        nome: string;
+        rating: number;
+        urt: number;
+        lat?: number;
+        lng?: number;
+        endereco?: string;
+      }>
+    >(),
+    nextPageToken: text("nextPageToken"),
+    pagina: int("pagina").default(0).notNull(),
+    encontrados: int("encontrados").default(0).notNull(),
+    importados: int("importados").default(0).notNull(),
+    duplicados: int("duplicados").default(0).notNull(),
+    erro: text("erro"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  t => ({
+    statusIdx: index("import_jobs_status_idx").on(t.status),
+  })
+);
 
 export type ImportJob = typeof importJobs.$inferSelect;
 export type InsertImportJob = typeof importJobs.$inferInsert;
@@ -295,50 +399,86 @@ export type InsertImportJob = typeof importJobs.$inferInsert;
  * Linha do tempo do centro de conversão: cada toque com o prospect
  * (e-mail enviado, ligação, anotação, mudança de etapa, etc.).
  */
-export const atendimentoEventos = mysqlTable("atendimento_eventos", {
-  id: int("id").autoincrement().primaryKey(),
-  oficinaId: int("oficinaId").notNull(),
-  autorUserId: int("autorUserId"),
-  canal: mysqlEnum("canal", [
-    "email",
-    "whatsapp",
-    "sms",
-    "telefone",
-    "presencial",
-    "outro",
-  ]).notNull(),
-  tipo: mysqlEnum("tipo", [
-    "enviado",
-    "entregue",
-    "aberto",
-    "clicado",
-    "respondeu",
-    "aceitou",
-    "recusou",
-    "nota",
-  ]).notNull(),
-  etapaNova: mysqlEnum("etapaNova", [
-    "lead_encontrado",
-    "convite_enviado",
-    "convite_entregue",
-    "visualizou",
-    "nao_respondeu",
-    "followup_1",
-    "followup_2",
-    "negociando",
-    "interesse_demonstrado",
-    "cadastro_iniciado",
-    "cadastro_concluido",
-    "ativado",
-    "operando",
-    "recusou",
-    "inativo",
-  ]),
-  mensagem: text("mensagem"),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-}, (t) => ({
-  oficinaIdx: index("atendimento_eventos_oficina_idx").on(t.oficinaId),
-}));
+export const atendimentoEventos = mysqlTable(
+  "atendimento_eventos",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    oficinaId: int("oficinaId").notNull(),
+    autorUserId: int("autorUserId"),
+    canal: mysqlEnum("canal", [
+      "email",
+      "whatsapp",
+      "sms",
+      "telefone",
+      "presencial",
+      "outro",
+    ]).notNull(),
+    tipo: mysqlEnum("tipo", [
+      "enviado",
+      "entregue",
+      "aberto",
+      "clicado",
+      "respondeu",
+      "aceitou",
+      "recusou",
+      "nota",
+    ]).notNull(),
+    etapaNova: mysqlEnum("etapaNova", [
+      "lead_encontrado",
+      "convite_enviado",
+      "convite_entregue",
+      "visualizou",
+      "nao_respondeu",
+      "followup_1",
+      "followup_2",
+      "negociando",
+      "interesse_demonstrado",
+      "cadastro_iniciado",
+      "cadastro_concluido",
+      "ativado",
+      "operando",
+      "recusou",
+      "inativo",
+    ]),
+    mensagem: text("mensagem"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  t => ({
+    oficinaIdx: index("atendimento_eventos_oficina_idx").on(t.oficinaId),
+  })
+);
 
 export type AtendimentoEvento = typeof atendimentoEventos.$inferSelect;
 export type InsertAtendimentoEvento = typeof atendimentoEventos.$inferInsert;
+
+// ============================================================
+// FINANCEIRO — REPASSES PARA PRESTADORES
+// ============================================================
+// Cada repasse representa um valor devido (ou já pago) a um prestador
+// da rede por serviços prestados. O fluxo manual permite operar antes
+// do módulo automatizado de ordens de serviço.
+export const repasses = mysqlTable(
+  "repasses",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    oficinaId: int("oficinaId").notNull(),
+    valor: decimal("valor", { precision: 12, scale: 2 }).notNull(),
+    descricao: text("descricao").notNull(),
+    referencia: varchar("referencia", { length: 80 }),
+    status: mysqlEnum("status", ["pendente", "aprovado", "pago", "cancelado"])
+      .default("pendente")
+      .notNull(),
+    observacoes: text("observacoes"),
+    criadoPorUserId: int("criadoPorUserId"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    pagoEm: timestamp("pagoEm"),
+  },
+  t => ({
+    oficinaIdx: index("repasses_oficina_idx").on(t.oficinaId),
+    statusIdx: index("repasses_status_idx").on(t.status),
+    pagoEmIdx: index("repasses_pago_em_idx").on(t.pagoEm),
+  })
+);
+
+export type Repasse = typeof repasses.$inferSelect;
+export type InsertRepasse = typeof repasses.$inferInsert;

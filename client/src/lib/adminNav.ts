@@ -126,9 +126,6 @@ export const ADMIN_NAV: AdminNavSection[] = [
         href: "/admin/financeiro/repasses",
         label: "Repasses",
         icon: Wallet,
-        emBreve: true,
-        descricao:
-          "Repasses aos prestadores da rede por acionamento, com extrato e comprovantes.",
       },
       {
         href: "/admin/financeiro/conciliacao",

@@ -34,6 +34,9 @@ import {
   atendimentoEventos,
   AtendimentoEvento,
   InsertAtendimentoEvento,
+  repasses,
+  Repasse,
+  InsertRepasse,
 } from "../drizzle/schema";
 import { ENV } from "./_core/env";
 import { encryptOficinaFields, decryptOficinaFields } from "./_core/crypto";
@@ -1000,4 +1003,181 @@ export async function metricasAtendimento(): Promise<MetricasAtendimento> {
     aceitaramCTA: Number(aceitos[0]?.c ?? 0),
     emConversao: Number(conv[0]?.c ?? 0),
   };
+}
+
+// ==================== FINANCEIRO — REPASSES ====================
+
+export type RepasseFiltros = {
+  status?: string;
+  oficinaId?: number;
+  search?: string;
+};
+
+function repasseConditions(f: RepasseFiltros): SQL | undefined {
+  const conds: SQL[] = [];
+  if (f.status) conds.push(eq(repasses.status, f.status as never));
+  if (f.oficinaId) conds.push(eq(repasses.oficinaId, f.oficinaId));
+  if (f.search) {
+    conds.push(
+      or(
+        like(repasses.descricao, `%${f.search}%`),
+        like(repasses.referencia, `%${f.search}%`)
+      ) as SQL
+    );
+  }
+  return conds.length ? (and(...conds) as SQL) : undefined;
+}
+
+export async function listRepasses(filtros: RepasseFiltros = {}, limit = 200) {
+  const db = await getDb();
+  if (!db) return [];
+  const where = repasseConditions(filtros);
+  const q = db
+    .select({
+      id: repasses.id,
+      oficinaId: repasses.oficinaId,
+      oficinaNome: oficinas.nomeFantasia,
+      cidade: oficinas.cidade,
+      estado: oficinas.estado,
+      valor: repasses.valor,
+      descricao: repasses.descricao,
+      referencia: repasses.referencia,
+      status: repasses.status,
+      observacoes: repasses.observacoes,
+      criadoPorUserId: repasses.criadoPorUserId,
+      createdAt: repasses.createdAt,
+      pagoEm: repasses.pagoEm,
+    })
+    .from(repasses)
+    .leftJoin(oficinas, eq(oficinas.id, repasses.oficinaId));
+  return (where ? q.where(where) : q)
+    .orderBy(desc(repasses.createdAt))
+    .limit(limit);
+}
+
+export async function createRepasse(data: InsertRepasse): Promise<number> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const r = await db.insert(repasses).values(data);
+  return r[0].insertId;
+}
+
+export async function getRepasseById(id: number): Promise<Repasse | undefined> {
+  const db = await getDb();
+  if (!db) return undefined;
+  const rows = await db
+    .select()
+    .from(repasses)
+    .where(eq(repasses.id, id))
+    .limit(1);
+  return rows[0];
+}
+
+export async function updateRepasseStatus(
+  id: number,
+  status: "pendente" | "aprovado" | "pago" | "cancelado",
+  observacoes?: string
+): Promise<void> {
+  const db = await getDb();
+  if (!db) throw new Error("Database not available");
+  const patch: Partial<InsertRepasse> = { status };
+  if (observacoes !== undefined) patch.observacoes = observacoes;
+  // Carimba pagoEm quando vai para "pago"; limpa quando sai de "pago".
+  if (status === "pago") patch.pagoEm = new Date();
+  else patch.pagoEm = null;
+  await db.update(repasses).set(patch).where(eq(repasses.id, id));
+}
+
+// Métricas para a tela de Repasses e para os KPIs do Investidor.
+export type MetricasRepasses = {
+  totalPendente: number;
+  countPendente: number;
+  totalAprovado: number;
+  countAprovado: number;
+  totalPagoMes: number;
+  countPagoMes: number;
+  totalPagoGeral: number;
+};
+
+export async function metricasRepasses(): Promise<MetricasRepasses> {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalPendente: 0,
+      countPendente: 0,
+      totalAprovado: 0,
+      countAprovado: 0,
+      totalPagoMes: 0,
+      countPagoMes: 0,
+      totalPagoGeral: 0,
+    };
+  }
+  const inicioMes = new Date();
+  inicioMes.setDate(1);
+  inicioMes.setHours(0, 0, 0, 0);
+  const [pend, apr, mes, geral] = await Promise.all([
+    db
+      .select({
+        total: sql<string>`COALESCE(SUM(${repasses.valor}), 0)`,
+        c: count(),
+      })
+      .from(repasses)
+      .where(eq(repasses.status, "pendente")),
+    db
+      .select({
+        total: sql<string>`COALESCE(SUM(${repasses.valor}), 0)`,
+        c: count(),
+      })
+      .from(repasses)
+      .where(eq(repasses.status, "aprovado")),
+    db
+      .select({
+        total: sql<string>`COALESCE(SUM(${repasses.valor}), 0)`,
+        c: count(),
+      })
+      .from(repasses)
+      .where(
+        and(
+          eq(repasses.status, "pago"),
+          sql`${repasses.pagoEm} >= ${inicioMes}`
+        )
+      ),
+    db
+      .select({ total: sql<string>`COALESCE(SUM(${repasses.valor}), 0)` })
+      .from(repasses)
+      .where(eq(repasses.status, "pago")),
+  ]);
+  return {
+    totalPendente: Number(pend[0]?.total ?? 0),
+    countPendente: Number(pend[0]?.c ?? 0),
+    totalAprovado: Number(apr[0]?.total ?? 0),
+    countAprovado: Number(apr[0]?.c ?? 0),
+    totalPagoMes: Number(mes[0]?.total ?? 0),
+    countPagoMes: Number(mes[0]?.c ?? 0),
+    totalPagoGeral: Number(geral[0]?.total ?? 0),
+  };
+}
+
+// Lista enxuta de oficinas (id + nome) para popular o select do diálogo
+// "Novo repasse". Usa só status "ativa" para evitar repassar a leads.
+export async function listOficinasParaSelect(): Promise<
+  Array<{
+    id: number;
+    nomeFantasia: string;
+    cidade: string | null;
+    estado: string | null;
+  }>
+> {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select({
+      id: oficinas.id,
+      nomeFantasia: oficinas.nomeFantasia,
+      cidade: oficinas.cidade,
+      estado: oficinas.estado,
+    })
+    .from(oficinas)
+    .orderBy(asc(oficinas.nomeFantasia))
+    .limit(500);
 }
