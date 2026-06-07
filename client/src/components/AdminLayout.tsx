@@ -2,27 +2,107 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { Building2, LayoutDashboard, Store, Star, Users, Bell, LogOut, ChevronLeft, Headphones, Download } from "lucide-react";
+import {
+  Building2,
+  LayoutDashboard,
+  Store,
+  Star,
+  Users,
+  Bell,
+  LogOut,
+  Headphones,
+  Download,
+  DollarSign,
+  UserCog,
+  Package,
+  LineChart,
+  Activity,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 
-const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/atendimento", label: "Atendimento", icon: Headphones },
-  { href: "/admin/oficinas", label: "Prestadores", icon: Store },
-  { href: "/admin/importar", label: "Importar", icon: Download },
-  { href: "/admin/avaliacoes", label: "Avaliações", icon: Star },
-  { href: "/admin/b2b", label: "Clientes B2B", icon: Users },
-  { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
+type NavItem = {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+  emBreve?: boolean;
+};
+type NavSection = { titulo: string; itens: NavItem[] };
+
+// Menu organizado por área. As seções "Em breve" são placeholders das
+// próximas áreas planejadas; cada item aponta para a tela genérica
+// AdminEmConstrucao até o conteúdo ser desenvolvido.
+const NAV_SECTIONS: NavSection[] = [
+  {
+    titulo: "Conversão",
+    itens: [
+      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+      { href: "/admin/atendimento", label: "Atendimento", icon: Headphones },
+    ],
+  },
+  {
+    titulo: "Clientes",
+    itens: [{ href: "/admin/b2b", label: "Clientes B2B", icon: Users }],
+  },
+  {
+    titulo: "Rede",
+    itens: [
+      { href: "/admin/oficinas", label: "Prestadores", icon: Store },
+      { href: "/admin/importar", label: "Importar", icon: Download },
+      { href: "/admin/avaliacoes", label: "Avaliações", icon: Star },
+    ],
+  },
+  {
+    titulo: "Monitoramento",
+    itens: [
+      { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
+      {
+        href: "/admin/monitoramento",
+        label: "Operação",
+        icon: Activity,
+        emBreve: true,
+      },
+    ],
+  },
+  {
+    titulo: "Próximas áreas",
+    itens: [
+      {
+        href: "/admin/financeiro",
+        label: "Financeiro",
+        icon: DollarSign,
+        emBreve: true,
+      },
+      { href: "/admin/rh", label: "RH", icon: UserCog, emBreve: true },
+      {
+        href: "/admin/estoque",
+        label: "Estoque",
+        icon: Package,
+        emBreve: true,
+      },
+      {
+        href: "/admin/investidor",
+        label: "Investidor",
+        icon: LineChart,
+        emBreve: true,
+      },
+    ],
+  },
 ];
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function AdminLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { user, isAuthenticated, loading, logout } = useAuth();
   const [location] = useLocation();
-  const { data: naoLidas } = trpc.notificacoes.contarNaoLidas.useQuery(undefined, {
-    enabled: isAuthenticated && user?.role === "admin",
-  });
+  const { data: naoLidas } = trpc.notificacoes.contarNaoLidas.useQuery(
+    undefined,
+    { enabled: isAuthenticated && user?.role === "admin" }
+  );
 
   if (loading) {
     return (
@@ -42,8 +122,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <h2 className="text-xl font-bold mb-2">Acesso Restrito</h2>
-          <p className="text-muted-foreground mb-4">Você não tem permissão para acessar esta área.</p>
-          <Button asChild variant="outline"><Link href="/">Voltar ao Início</Link></Button>
+          <p className="text-muted-foreground mb-4">
+            Você não tem permissão para acessar esta área.
+          </p>
+          <Button asChild variant="outline">
+            <Link href="/">Voltar ao Início</Link>
+          </Button>
         </div>
       </div>
     );
@@ -60,44 +144,83 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </div>
             <div>
               <span className="font-bold text-sm">GO SERVICE</span>
-              <p className="text-[10px] text-muted-foreground -mt-0.5">Painel da Rede</p>
+              <p className="text-[10px] text-muted-foreground -mt-0.5">
+                Painel da Rede
+              </p>
             </div>
           </Link>
         </div>
 
         <Separator />
 
-        <nav className="flex-1 p-3 space-y-1">
-          {NAV_ITEMS.map(item => {
-            const isActive = location === item.href;
-            return (
-              <Link key={item.href} href={item.href}>
-                <span className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all ${
-                  isActive ? "bg-primary text-white shadow-sm" : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                }`}>
-                  <item.icon className="w-4 h-4" />
-                  {item.label}
-                  {item.href === "/admin/notificacoes" && naoLidas && naoLidas > 0 && (
-                    <Badge className="ml-auto h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-destructive">
-                      {naoLidas}
-                    </Badge>
-                  )}
-                </span>
-              </Link>
-            );
-          })}
+        <nav className="flex-1 overflow-y-auto p-3 space-y-5">
+          {NAV_SECTIONS.map(section => (
+            <div key={section.titulo}>
+              <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
+                {section.titulo}
+              </div>
+              <ul className="space-y-1">
+                {section.itens.map(item => {
+                  const isActive = location === item.href;
+                  return (
+                    <li key={item.href}>
+                      <Link href={item.href}>
+                        <span
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
+                            isActive
+                              ? "bg-primary text-white shadow-sm"
+                              : item.emBreve
+                                ? "text-muted-foreground/70 hover:text-foreground hover:bg-muted"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
+                          }`}
+                        >
+                          <item.icon className="w-4 h-4" />
+                          <span className="flex-1 truncate">{item.label}</span>
+                          {item.href === "/admin/notificacoes" &&
+                            naoLidas &&
+                            naoLidas > 0 && (
+                              <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-destructive">
+                                {naoLidas}
+                              </Badge>
+                            )}
+                          {item.emBreve && (
+                            <span
+                              className={`text-[9px] uppercase tracking-wide rounded-full px-1.5 py-0.5 ${
+                                isActive
+                                  ? "bg-white/20 text-white"
+                                  : "bg-muted text-muted-foreground"
+                              }`}
+                            >
+                              Em breve
+                            </span>
+                          )}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          ))}
         </nav>
 
         <div className="p-3 border-t border-border/50">
           <div className="flex items-center gap-3 px-3 py-2">
             <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-              <span className="text-xs font-medium text-primary">{user?.name?.[0] || "A"}</span>
+              <span className="text-xs font-medium text-primary">
+                {user?.name?.[0] || "A"}
+              </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium truncate">{user?.name || "Admin"}</p>
+              <p className="text-xs font-medium truncate">
+                {user?.name || "Admin"}
+              </p>
               <p className="text-[10px] text-muted-foreground">Administrador</p>
             </div>
-            <button onClick={() => logout()} className="p-1.5 rounded-md hover:bg-muted text-muted-foreground">
+            <button
+              onClick={() => logout()}
+              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+            >
               <LogOut className="w-3.5 h-3.5" />
             </button>
           </div>
