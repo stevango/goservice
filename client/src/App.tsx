@@ -21,6 +21,7 @@ import AdminImportar from "./pages/admin/AdminImportar";
 import AdminEmConstrucao from "./pages/admin/AdminEmConstrucao";
 import PaginaParceiro from "./pages/PaginaParceiro";
 import Login from "./pages/Login";
+import { adminEmBreveItens } from "@/lib/adminNav";
 
 function Router() {
   return (
@@ -40,36 +41,16 @@ function Router() {
       <Route path="/admin/notificacoes" component={AdminNotificacoes} />
       <Route path="/admin/atendimento" component={AdminAtendimento} />
       <Route path="/admin/importar" component={AdminImportar} />
-      <Route path="/admin/monitoramento">
-        <AdminEmConstrucao
-          titulo="Monitoramento — Operação"
-          descricao="Dashboards de operação, SLAs, fila de eventos e saúde dos jobs em background."
-        />
-      </Route>
-      <Route path="/admin/financeiro">
-        <AdminEmConstrucao
-          titulo="Financeiro"
-          descricao="Contas a pagar e receber, repasses para prestadores, conciliação e relatórios."
-        />
-      </Route>
-      <Route path="/admin/rh">
-        <AdminEmConstrucao
-          titulo="RH"
-          descricao="Equipe interna, papéis, permissões e gestão de pessoas da GO SERVICE."
-        />
-      </Route>
-      <Route path="/admin/estoque">
-        <AdminEmConstrucao
-          titulo="Estoque"
-          descricao="Catálogo de peças e insumos, posição de estoque por prestador e movimentações."
-        />
-      </Route>
-      <Route path="/admin/investidor">
-        <AdminEmConstrucao
-          titulo="Área do Investidor"
-          descricao="KPIs do negócio, growth, unit economics e relatórios para investidores."
-        />
-      </Route>
+      {/* Rotas das áreas em construção são geradas a partir de adminNav,
+          mantendo menu e rotas em sincronia. */}
+      {adminEmBreveItens().map(item => (
+        <Route key={item.href} path={item.href}>
+          <AdminEmConstrucao
+            titulo={`${item.sectionTitle} · ${item.label}`}
+            descricao={item.descricao ?? "Área planejada — em construção."}
+          />
+        </Route>
+      ))}
       <Route path="/b2b" component={AreaB2B} />
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

@@ -2,95 +2,24 @@ import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { Link, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import {
-  Building2,
-  LayoutDashboard,
-  Store,
-  Star,
-  Users,
-  Bell,
-  LogOut,
-  Headphones,
-  Download,
-  DollarSign,
-  UserCog,
-  Package,
-  LineChart,
-  Activity,
-} from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import { Building2, LogOut, ChevronDown } from "lucide-react";
+import { useEffect, useState, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { ADMIN_NAV, adminSecaoDaRota } from "@/lib/adminNav";
 
-type NavItem = {
-  href: string;
-  label: string;
-  icon: LucideIcon;
-  emBreve?: boolean;
-};
-type NavSection = { titulo: string; itens: NavItem[] };
+const STORAGE_KEY = "goservice.admin.openSections.v1";
 
-// Menu organizado por área. As seções "Em breve" são placeholders das
-// próximas áreas planejadas; cada item aponta para a tela genérica
-// AdminEmConstrucao até o conteúdo ser desenvolvido.
-const NAV_SECTIONS: NavSection[] = [
-  {
-    titulo: "Conversão",
-    itens: [
-      { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-      { href: "/admin/atendimento", label: "Atendimento", icon: Headphones },
-    ],
-  },
-  {
-    titulo: "Clientes",
-    itens: [{ href: "/admin/b2b", label: "Clientes B2B", icon: Users }],
-  },
-  {
-    titulo: "Rede",
-    itens: [
-      { href: "/admin/oficinas", label: "Prestadores", icon: Store },
-      { href: "/admin/importar", label: "Importar", icon: Download },
-      { href: "/admin/avaliacoes", label: "Avaliações", icon: Star },
-    ],
-  },
-  {
-    titulo: "Monitoramento",
-    itens: [
-      { href: "/admin/notificacoes", label: "Notificações", icon: Bell },
-      {
-        href: "/admin/monitoramento",
-        label: "Operação",
-        icon: Activity,
-        emBreve: true,
-      },
-    ],
-  },
-  {
-    titulo: "Próximas áreas",
-    itens: [
-      {
-        href: "/admin/financeiro",
-        label: "Financeiro",
-        icon: DollarSign,
-        emBreve: true,
-      },
-      { href: "/admin/rh", label: "RH", icon: UserCog, emBreve: true },
-      {
-        href: "/admin/estoque",
-        label: "Estoque",
-        icon: Package,
-        emBreve: true,
-      },
-      {
-        href: "/admin/investidor",
-        label: "Investidor",
-        icon: LineChart,
-        emBreve: true,
-      },
-    ],
-  },
-];
+function carregarSecoesAbertas(): Record<string, boolean> {
+  if (typeof window === "undefined") return {};
+  try {
+    const raw = window.localStorage.getItem(STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+  } catch {
+    return {};
+  }
+}
 
 export default function AdminLayout({
   children,
@@ -103,6 +32,35 @@ export default function AdminLayout({
     undefined,
     { enabled: isAuthenticated && user?.role === "admin" }
   );
+
+  const secaoAtiva = adminSecaoDaRota(location);
+  const [abertas, setAbertas] = useState<Record<string, boolean>>(() => {
+    const persistido = carregarSecoesAbertas();
+    // Garante que a seção da rota atual começa expandida.
+    if (secaoAtiva) persistido[secaoAtiva] = true;
+    return persistido;
+  });
+
+  // Sempre que a rota mudar, mantém a seção dela aberta sem fechar as
+  // outras que o usuário deixou abertas.
+  useEffect(() => {
+    if (!secaoAtiva) return;
+    setAbertas(prev =>
+      prev[secaoAtiva] ? prev : { ...prev, [secaoAtiva]: true }
+    );
+  }, [secaoAtiva]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(abertas));
+    } catch {
+      // Sem localStorage (ex.: modo privado) — segue sem persistir.
+    }
+  }, [abertas]);
+
+  const alternar = useCallback((id: string) => {
+    setAbertas(prev => ({ ...prev, [id]: !prev[id] }));
+  }, []);
 
   if (loading) {
     return (
@@ -135,7 +93,6 @@ export default function AdminLayout({
 
   return (
     <div className="min-h-screen flex">
-      {/* Sidebar */}
       <aside className="w-64 border-r border-border/50 bg-card flex flex-col fixed h-full">
         <div className="p-5">
           <Link href="/" className="flex items-center gap-2.5">
@@ -153,55 +110,87 @@ export default function AdminLayout({
 
         <Separator />
 
-        <nav className="flex-1 overflow-y-auto p-3 space-y-5">
-          {NAV_SECTIONS.map(section => (
-            <div key={section.titulo}>
-              <div className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground/70">
-                {section.titulo}
-              </div>
-              <ul className="space-y-1">
-                {section.itens.map(item => {
-                  const isActive = location === item.href;
-                  return (
-                    <li key={item.href}>
-                      <Link href={item.href}>
-                        <span
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all ${
-                            isActive
-                              ? "bg-primary text-white shadow-sm"
-                              : item.emBreve
-                                ? "text-muted-foreground/70 hover:text-foreground hover:bg-muted"
-                                : "text-muted-foreground hover:text-foreground hover:bg-muted"
-                          }`}
-                        >
-                          <item.icon className="w-4 h-4" />
-                          <span className="flex-1 truncate">{item.label}</span>
-                          {item.href === "/admin/notificacoes" &&
-                            naoLidas &&
-                            naoLidas > 0 && (
-                              <Badge className="h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-destructive">
-                                {naoLidas}
-                              </Badge>
-                            )}
-                          {item.emBreve && (
+        <nav className="flex-1 overflow-y-auto p-3 space-y-1">
+          {ADMIN_NAV.map(section => {
+            const aberto = abertas[section.id] ?? false;
+            const ativa = secaoAtiva === section.id;
+            const SectionIcon = section.icon;
+            const todosEmBreve = section.itens.every(i => i.emBreve);
+            return (
+              <div key={section.id}>
+                <button
+                  type="button"
+                  onClick={() => alternar(section.id)}
+                  aria-expanded={aberto}
+                  className={`w-full flex items-center gap-2 px-3 py-2 rounded-lg text-[11px] font-semibold uppercase tracking-wider transition-colors ${
+                    ativa
+                      ? "text-foreground bg-muted/60"
+                      : "text-muted-foreground/70 hover:text-foreground hover:bg-muted/40"
+                  }`}
+                >
+                  <SectionIcon className="w-3.5 h-3.5" />
+                  <span className="flex-1 text-left">{section.titulo}</span>
+                  {todosEmBreve && (
+                    <span className="text-[9px] normal-case tracking-normal rounded-full bg-muted px-1.5 py-0.5 text-muted-foreground">
+                      Em breve
+                    </span>
+                  )}
+                  <ChevronDown
+                    className={`w-3.5 h-3.5 transition-transform ${
+                      aberto ? "" : "-rotate-90"
+                    }`}
+                  />
+                </button>
+                {aberto && (
+                  <ul className="mt-1 mb-2 ml-2 pl-2 border-l border-border/50 space-y-0.5">
+                    {section.itens.map(item => {
+                      const isActive = location === item.href;
+                      const ItemIcon = item.icon;
+                      return (
+                        <li key={item.href}>
+                          <Link href={item.href}>
                             <span
-                              className={`text-[9px] uppercase tracking-wide rounded-full px-1.5 py-0.5 ${
+                              className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-sm font-medium transition-all ${
                                 isActive
-                                  ? "bg-white/20 text-white"
-                                  : "bg-muted text-muted-foreground"
+                                  ? "bg-primary text-white shadow-sm"
+                                  : item.emBreve
+                                    ? "text-muted-foreground/70 hover:text-foreground hover:bg-muted"
+                                    : "text-muted-foreground hover:text-foreground hover:bg-muted"
                               }`}
                             >
-                              Em breve
+                              <ItemIcon className="w-3.5 h-3.5 shrink-0" />
+                              <span className="flex-1 truncate">
+                                {item.label}
+                              </span>
+                              {item.href === "/admin/notificacoes" &&
+                                naoLidas &&
+                                naoLidas > 0 && (
+                                  <Badge className="h-4 min-w-4 px-1 flex items-center justify-center text-[9px] bg-destructive">
+                                    {naoLidas}
+                                  </Badge>
+                                )}
+                              {item.emBreve &&
+                                !section.itens.every(i => i.emBreve) && (
+                                  <span
+                                    className={`text-[9px] uppercase tracking-wide rounded-full px-1.5 py-0.5 ${
+                                      isActive
+                                        ? "bg-white/20 text-white"
+                                        : "bg-muted text-muted-foreground"
+                                    }`}
+                                  >
+                                    Em breve
+                                  </span>
+                                )}
                             </span>
-                          )}
-                        </span>
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          ))}
+                          </Link>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </nav>
 
         <div className="p-3 border-t border-border/50">
@@ -220,6 +209,7 @@ export default function AdminLayout({
             <button
               onClick={() => logout()}
               className="p-1.5 rounded-md hover:bg-muted text-muted-foreground"
+              title="Sair"
             >
               <LogOut className="w-3.5 h-3.5" />
             </button>
@@ -227,7 +217,6 @@ export default function AdminLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
       <main className="flex-1 ml-64 min-w-0">
         <div className="p-6 md:p-8">{children}</div>
       </main>
