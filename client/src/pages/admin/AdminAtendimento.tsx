@@ -36,6 +36,9 @@ import {
   Zap,
   ArrowRight,
   Link2 as LinkIcon,
+  Users,
+  TrendingUp,
+  CheckCircle2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
@@ -90,6 +93,9 @@ export default function AdminAtendimento() {
   const [estado, setEstado] = useState("");
   const [openId, setOpenId] = useState<number | null>(null);
 
+  const metricas = trpc.atendimento.metricas.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
   const kanban = trpc.atendimento.kanban.useQuery(
     {
       search: search || undefined,
@@ -176,6 +182,8 @@ export default function AdminAtendimento() {
           </Select>
         </div>
       </div>
+
+      <MetricasStrip data={metricas.data} loading={metricas.isLoading} />
 
       {kanban.isLoading ? (
         <div className="flex justify-center py-20">
@@ -1079,6 +1087,106 @@ function PreviewEmail({
         Você recebeu este e-mail porque seu estabelecimento foi identificado
         como potencial parceiro da rede.
       </div>
+    </div>
+  );
+}
+
+type Metricas = {
+  totalProspects: number;
+  comAutomacao: number;
+  visualizaramPagina: number;
+  aceitaramCTA: number;
+  emConversao: number;
+};
+
+function MetricasStrip({
+  data,
+  loading,
+}: {
+  data: Metricas | undefined;
+  loading: boolean;
+}) {
+  const pct = (n: number, total: number) =>
+    total > 0 ? `${Math.round((n / total) * 100)}%` : "—";
+  const m = data ?? {
+    totalProspects: 0,
+    comAutomacao: 0,
+    visualizaramPagina: 0,
+    aceitaramCTA: 0,
+    emConversao: 0,
+  };
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+      <MetricaCard
+        icon={<Users className="w-3.5 h-3.5" />}
+        label="Prospects"
+        valor={m.totalProspects}
+        loading={loading}
+      />
+      <MetricaCard
+        icon={<Zap className="w-3.5 h-3.5" />}
+        label="Em automação"
+        valor={m.comAutomacao}
+        sub={pct(m.comAutomacao, m.totalProspects)}
+        loading={loading}
+        accent="text-primary"
+      />
+      <MetricaCard
+        icon={<Eye className="w-3.5 h-3.5" />}
+        label="Viram a página"
+        valor={m.visualizaramPagina}
+        sub={pct(m.visualizaramPagina, m.totalProspects)}
+        loading={loading}
+      />
+      <MetricaCard
+        icon={<CheckCircle2 className="w-3.5 h-3.5" />}
+        label="Clicaram no CTA"
+        valor={m.aceitaramCTA}
+        sub={pct(m.aceitaramCTA, m.totalProspects)}
+        loading={loading}
+        accent="text-green-600"
+      />
+      <MetricaCard
+        icon={<TrendingUp className="w-3.5 h-3.5" />}
+        label="Em conversão"
+        valor={m.emConversao}
+        sub={pct(m.emConversao, m.totalProspects)}
+        loading={loading}
+        accent="text-green-600"
+      />
+    </div>
+  );
+}
+
+function MetricaCard({
+  icon,
+  label,
+  valor,
+  sub,
+  loading,
+  accent = "text-foreground",
+}: {
+  icon: React.ReactNode;
+  label: string;
+  valor: number;
+  sub?: string;
+  loading: boolean;
+  accent?: string;
+}) {
+  return (
+    <div className="rounded-xl border bg-card px-4 py-3">
+      <div className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+        {icon}
+        {label}
+      </div>
+      {loading ? (
+        <div className="mt-1.5 h-6 w-12 animate-pulse rounded bg-muted" />
+      ) : (
+        <div className="mt-0.5 flex items-baseline gap-2">
+          <span className={`text-2xl font-bold ${accent}`}>{valor}</span>
+          {sub && <span className="text-xs text-muted-foreground">{sub}</span>}
+        </div>
+      )}
     </div>
   );
 }

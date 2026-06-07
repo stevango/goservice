@@ -936,3 +936,68 @@ export async function listProspectsParaAutomacao(
     .limit(limit);
   return rows as ProspectAutomacao[];
 }
+
+// Métricas para o PDCA do Centro de Conversão.
+export type MetricasAtendimento = {
+  totalProspects: number;
+  comAutomacao: number;
+  visualizaramPagina: number;
+  aceitaramCTA: number;
+  emConversao: number; // chegaram em cadastro_iniciado ou além
+};
+
+export async function metricasAtendimento(): Promise<MetricasAtendimento> {
+  const db = await getDb();
+  if (!db) {
+    return {
+      totalProspects: 0,
+      comAutomacao: 0,
+      visualizaramPagina: 0,
+      aceitaramCTA: 0,
+      emConversao: 0,
+    };
+  }
+  const ETAPAS_CONVERTIDAS = [
+    "cadastro_iniciado",
+    "cadastro_concluido",
+    "ativado",
+    "operando",
+  ] as const;
+  const [total, auto, conv, abertos, aceitos] = await Promise.all([
+    db.select({ c: count() }).from(oficinas),
+    db
+      .select({ c: count() })
+      .from(oficinas)
+      .where(eq(oficinas.automacaoAtiva, true)),
+    db
+      .select({ c: count() })
+      .from(oficinas)
+      .where(
+        inArray(
+          oficinas.etapaAtendimento,
+          ETAPAS_CONVERTIDAS as unknown as Array<
+            (typeof oficinas.etapaAtendimento.enumValues)[number]
+          >
+        )
+      ),
+    db
+      .select({
+        c: sql<number>`COUNT(DISTINCT ${atendimentoEventos.oficinaId})`,
+      })
+      .from(atendimentoEventos)
+      .where(eq(atendimentoEventos.tipo, "aberto")),
+    db
+      .select({
+        c: sql<number>`COUNT(DISTINCT ${atendimentoEventos.oficinaId})`,
+      })
+      .from(atendimentoEventos)
+      .where(eq(atendimentoEventos.tipo, "aceitou")),
+  ]);
+  return {
+    totalProspects: Number(total[0]?.c ?? 0),
+    comAutomacao: Number(auto[0]?.c ?? 0),
+    visualizaramPagina: Number(abertos[0]?.c ?? 0),
+    aceitaramCTA: Number(aceitos[0]?.c ?? 0),
+    emConversao: Number(conv[0]?.c ?? 0),
+  };
+}

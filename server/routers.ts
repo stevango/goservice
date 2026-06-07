@@ -795,6 +795,12 @@ export const appRouter = router({
       return { processados };
     }),
 
+    // Métricas do funil para o PDCA: total, automação, engajamento e
+    // conversão (entrada no cadastro).
+    metricas: adminProcedure.query(async () => {
+      return db.metricasAtendimento();
+    }),
+
     // Link rastreável do parceiro (para colar manualmente na mensagem).
     linkParceiro: adminProcedure
       .input(z.object({ id: z.number() }))

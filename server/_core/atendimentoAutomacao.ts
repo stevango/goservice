@@ -1,5 +1,7 @@
 import {
   AUTOMACAO_CADENCIA_HORAS,
+  MAX_TENTATIVAS_AUTOMACAO,
+  automacaoAtingiuLimite,
   etapaEncerraAutomacao,
   proximaEtapaCadencia,
   sugerirMensagem,
@@ -42,6 +44,22 @@ export async function processarAutomacao(): Promise<number> {
     // Segurança: se já saiu da fase de convite, desliga a automação.
     if (etapaEncerraAutomacao(p.etapaAtendimento)) {
       await db.updateOficina(p.id, { automacaoAtiva: false });
+      continue;
+    }
+
+    // Cap: depois do limite, pausa e devolve para revisão humana.
+    if (automacaoAtingiuLimite(p.tentativasConvite)) {
+      await db.updateOficina(p.id, {
+        automacaoAtiva: false,
+        etapaAtendimento: "nao_respondeu",
+      });
+      await db.addAtendimentoEvento({
+        oficinaId: p.id,
+        canal: "outro",
+        tipo: "nota",
+        etapaNova: "nao_respondeu",
+        mensagem: `Automação pausada após ${MAX_TENTATIVAS_AUTOMACAO} reconvites sem resposta. Marcada para revisão humana.`,
+      });
       continue;
     }
 

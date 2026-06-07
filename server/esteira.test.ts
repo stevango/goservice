@@ -4,6 +4,8 @@ import {
   proximaEtapaCadencia,
   etapaConvidavel,
   etapaEncerraAutomacao,
+  automacaoAtingiuLimite,
+  MAX_TENTATIVAS_AUTOMACAO,
 } from "@shared/types";
 
 describe("avanço manual da esteira", () => {
@@ -57,5 +59,17 @@ describe("condições de parada da automação", () => {
   it("negociando/interesse não são reconvidados pela automação", () => {
     expect(etapaConvidavel("negociando")).toBe(false);
     expect(etapaEncerraAutomacao("negociando")).toBe(true);
+  });
+});
+
+describe("cap de segurança da automação", () => {
+  it("não atinge limite abaixo do teto", () => {
+    expect(automacaoAtingiuLimite(0)).toBe(false);
+    expect(automacaoAtingiuLimite(MAX_TENTATIVAS_AUTOMACAO - 1)).toBe(false);
+  });
+
+  it("atinge limite no teto e acima", () => {
+    expect(automacaoAtingiuLimite(MAX_TENTATIVAS_AUTOMACAO)).toBe(true);
+    expect(automacaoAtingiuLimite(MAX_TENTATIVAS_AUTOMACAO + 5)).toBe(true);
   });
 });

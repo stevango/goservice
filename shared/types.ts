@@ -582,6 +582,14 @@ export function proximaEtapaCadencia(
 // Intervalo entre reconvites da automação (em horas). 24h = todo dia.
 export const AUTOMACAO_CADENCIA_HORAS = 24;
 
+// Limite de reconvites antes de pausar e devolver o prospect para revisão
+// humana. Evita "spam infinito" e materializa o sucesso ou a desistência.
+export const MAX_TENTATIVAS_AUTOMACAO = 10;
+
+export function automacaoAtingiuLimite(tentativas: number): boolean {
+  return tentativas >= MAX_TENTATIVAS_AUTOMACAO;
+}
+
 export const ATENDIMENTO_CANAIS = [
   "email",
   "whatsapp",

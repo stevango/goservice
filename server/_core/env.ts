@@ -12,4 +12,7 @@ export const ENV = {
   // URL pública do app, usada para montar o link rastreável do parceiro
   // no worker de automação (onde não há window.location).
   appUrl: (process.env.APP_URL ?? "").replace(/\/+$/, ""),
+  // Envio de e-mail real (Resend). Sem chave, o sender opera em modo stub.
+  resendApiKey: process.env.RESEND_API_KEY ?? "",
+  fromEmail: process.env.FROM_EMAIL ?? "",
 };
