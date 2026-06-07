@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { ADMIN_NAV, adminSecaoDaRota } from "@/lib/adminNav";
+import AdminCommandPalette from "@/components/AdminCommandPalette";
+import AdminBreadcrumbs from "@/components/AdminBreadcrumbs";
 
 const STORAGE_KEY = "goservice.admin.openSections.v1";
 
@@ -218,8 +220,13 @@ export default function AdminLayout({
       </aside>
 
       <main className="flex-1 ml-64 min-w-0">
-        <div className="p-6 md:p-8">{children}</div>
+        <div className="p-6 md:p-8">
+          <AdminBreadcrumbs />
+          {children}
+        </div>
       </main>
+
+      <AdminCommandPalette />
     </div>
   );
 }

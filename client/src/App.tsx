@@ -19,6 +19,7 @@ import MinhaOficina from "./pages/MinhaOficina";
 import AdminAtendimento from "./pages/admin/AdminAtendimento";
 import AdminImportar from "./pages/admin/AdminImportar";
 import AdminEmConstrucao from "./pages/admin/AdminEmConstrucao";
+import AdminInvestidorKpis from "./pages/admin/AdminInvestidorKpis";
 import PaginaParceiro from "./pages/PaginaParceiro";
 import Login from "./pages/Login";
 import { adminEmBreveItens } from "@/lib/adminNav";
@@ -41,6 +42,7 @@ function Router() {
       <Route path="/admin/notificacoes" component={AdminNotificacoes} />
       <Route path="/admin/atendimento" component={AdminAtendimento} />
       <Route path="/admin/importar" component={AdminImportar} />
+      <Route path="/admin/investidor/kpis" component={AdminInvestidorKpis} />
       {/* Rotas das áreas em construção são geradas a partir de adminNav,
           mantendo menu e rotas em sincronia. */}
       {adminEmBreveItens().map(item => (

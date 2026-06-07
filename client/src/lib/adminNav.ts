@@ -229,9 +229,6 @@ export const ADMIN_NAV: AdminNavSection[] = [
         href: "/admin/investidor/kpis",
         label: "KPIs do negócio",
         icon: TrendingUp,
-        emBreve: true,
-        descricao:
-          "Indicadores-chave do negócio em uma visão consolidada e em tempo real.",
       },
       {
         href: "/admin/investidor/growth",
@@ -278,6 +275,17 @@ export function adminEmBreveItens(): Array<
 export function adminSecaoDaRota(pathname: string): string | null {
   for (const section of ADMIN_NAV) {
     if (section.itens.some(i => i.href === pathname)) return section.id;
+  }
+  return null;
+}
+
+// Encontra a seção + item para uma URL. Usada pelos breadcrumbs.
+export function adminLocalizar(
+  pathname: string
+): { section: AdminNavSection; item: AdminNavItem } | null {
+  for (const section of ADMIN_NAV) {
+    const item = section.itens.find(i => i.href === pathname);
+    if (item) return { section, item };
   }
   return null;
 }
